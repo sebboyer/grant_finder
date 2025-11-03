@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zeffy Grant Finder - Discover Foundation Grants</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <img src="{{ url_for('static', filename='zeffy-logo-white.png') }}" alt="Zeffy Logo" class="logo">
+                <div class="header-text">
+                    <h1>Grant Finder</h1>
+                    <p class="subtitle">Discover foundations and the grants they award</p>
+                </div>
+            </div>
+            
+            <!-- View Toggle Navigation -->
+            <nav class="view-toggle">
+                <button id="grants-view-btn" class="active" onclick="switchView('grants')">Individual Grants</button>
+                <button id="foundations-view-btn" onclick="switchView('foundations')">Foundations</button>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <!-- GRANTS VIEW -->
+            <div id="grants-view" class="view-container active">
+                <!-- Search Section -->
+                <section class="search-section">
+                    <div class="search-header">
+                        <h2>Search Individual Grants</h2>
+                        <p id="grants-stats-summary">Loading...</p>
+                    </div>
+
+                    <div class="filters-container">
+                        <div class="filter-group">
+                            <label for="grants-foundation-search">Foundation Name</label>
+                            <input 
+                                type="text" 
+                                id="grants-foundation-search" 
+                                placeholder="Search by foundation name..."
+                                autocomplete="off"
+                            >
+                            <div id="grants-foundation-suggestions" class="suggestions-dropdown"></div>
+                        </div>
+
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label for="grants-state-filter">Recipient State</label>
+                                <select id="grants-state-filter">
+                                    <option value="">All States</option>
+                                </select>
+                            </div>
+
+                            <div class="filter-group">
+                                <label for="grants-city-filter">Recipient City</label>
+                                <input 
+                                    type="text" 
+                                    id="grants-city-filter" 
+                                    placeholder="Enter city..."
+                                >
+                            </div>
+                        </div>
+
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label for="grants-min-amount">Minimum Grant Amount</label>
+                                <input 
+                                    type="number" 
+                                    id="grants-min-amount" 
+                                    placeholder="$0"
+                                    min="0"
+                                >
+                            </div>
+
+                            <div class="filter-group">
+                                <label for="grants-max-amount">Maximum Grant Amount</label>
+                                <input 
+                                    type="number" 
+                                    id="grants-max-amount" 
+                                    placeholder="No limit"
+                                    min="0"
+                                >
+                            </div>
+                        </div>
+
+                        <div class="filter-actions">
+                            <button id="grants-search-btn" class="btn-primary">Search Grants</button>
+                            <button id="grants-clear-btn" class="btn-secondary">Clear Filters</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Results Section -->
+                <section class="results-section">
+                    <div class="results-header">
+                        <h3 id="grants-results-count">Search to see grants</h3>
+                    </div>
+
+                    <div id="grants-loading-indicator" class="loading-indicator" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Searching grants...</p>
+                    </div>
+
+                    <div id="grants-results-container" class="grants-grid">
+                        <!-- Grant cards will be inserted here -->
+                    </div>
+
+                    <div id="grants-pagination-container" class="pagination">
+                        <!-- Pagination will be inserted here -->
+                    </div>
+                </section>
+            </div>
+
+            <!-- FOUNDATIONS VIEW -->
+            <div id="foundations-view" class="view-container">
+                <!-- Search Section -->
+                <section class="search-section">
+                    <div class="search-header">
+                        <h2>Browse Foundations</h2>
+                        <p id="foundations-stats-summary">Loading...</p>
+                    </div>
+
+                    <div class="filters-container">
+                        <div class="filter-group">
+                            <label for="foundations-name-search">Foundation Name</label>
+                            <input 
+                                type="text" 
+                                id="foundations-name-search" 
+                                placeholder="Search by foundation name..."
+                                autocomplete="off"
+                            >
+                            <div id="foundations-name-suggestions" class="suggestions-dropdown"></div>
+                        </div>
+
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label for="foundations-state-filter">States They Give To</label>
+                                <select id="foundations-state-filter">
+                                    <option value="">All States</option>
+                                </select>
+                            </div>
+
+                            <div class="filter-group">
+                                <label for="foundations-min-grants">Minimum # of Grants</label>
+                                <input 
+                                    type="number" 
+                                    id="foundations-min-grants" 
+                                    placeholder="Any"
+                                    min="1"
+                                >
+                            </div>
+                        </div>
+
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label for="foundations-min-total">Minimum Total Giving</label>
+                                <input 
+                                    type="number" 
+                                    id="foundations-min-total" 
+                                    placeholder="$0"
+                                    min="0"
+                                >
+                            </div>
+
+                            <div class="filter-group">
+                                <label for="foundations-max-total">Maximum Total Giving</label>
+                                <input 
+                                    type="number" 
+                                    id="foundations-max-total" 
+                                    placeholder="No limit"
+                                    min="0"
+                                >
+                            </div>
+                        </div>
+
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label for="foundations-min-median">Minimum Median Grant</label>
+                                <input 
+                                    type="number" 
+                                    id="foundations-min-median" 
+                                    placeholder="$0"
+                                    min="0"
+                                >
+                            </div>
+
+                            <div class="filter-group">
+                                <label for="foundations-max-median">Maximum Median Grant</label>
+                                <input 
+                                    type="number" 
+                                    id="foundations-max-median" 
+                                    placeholder="No limit"
+                                    min="0"
+                                >
+                            </div>
+                        </div>
+
+                        <div class="filter-actions">
+                            <button id="foundations-search-btn" class="btn-primary">Search Foundations</button>
+                            <button id="foundations-clear-btn" class="btn-secondary">Clear Filters</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Results Section -->
+                <section class="results-section">
+                    <div class="results-header">
+                        <h3 id="foundations-results-count">Search to see foundations</h3>
+                    </div>
+
+                    <div id="foundations-loading-indicator" class="loading-indicator" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Searching foundations...</p>
+                    </div>
+
+                    <div id="foundations-results-container" class="foundations-grid">
+                        <!-- Foundation cards will be inserted here -->
+                    </div>
+
+                    <div id="foundations-pagination-container" class="pagination">
+                        <!-- Pagination will be inserted here -->
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>Data sourced from IRS Form 990 filings | Zeffy Grant Finder &copy; 2025</p>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

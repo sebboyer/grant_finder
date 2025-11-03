@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foundation Profile - Grant Finder</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/topojson.v3.min.js"></script>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-nav">
+                <a href="/" class="back-link">← Back to Search</a>
+            </div>
+            <div id="foundation-header">
+                <h1 id="foundation-name">Loading...</h1>
+                <p class="foundation-ein-display" id="foundation-ein">EIN: {{ ein }}</p>
+                <div id="primary-state-display" class="primary-state-display" style="display: none;">
+                    <span class="primary-state-icon">📍</span>
+                    <span class="primary-state-label">Primary State of Activity:</span>
+                    <span class="primary-state-value" id="primary-state-value"></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <div class="container">
+            <div id="profile-loading" class="loading-indicator">
+                <div class="spinner"></div>
+                <p>Loading foundation profile...</p>
+            </div>
+
+            <div id="profile-content" style="display: none;">
+                <!-- Key Stats Section -->
+                <section class="profile-section stats-overview">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">📊</div>
+                            <div class="stat-info">
+                                <div class="stat-label">Total Grants</div>
+                                <div class="stat-value" id="stat-grant-count">-</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">💰</div>
+                            <div class="stat-info">
+                                <div class="stat-label">Total Given</div>
+                                <div class="stat-value" id="stat-total-amount">-</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📈</div>
+                            <div class="stat-info">
+                                <div class="stat-label">Median Grant</div>
+                                <div class="stat-value secondary" id="stat-median">-</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📉</div>
+                            <div class="stat-info">
+                                <div class="stat-label">Average Grant</div>
+                                <div class="stat-value" id="stat-average">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Grant Range Section -->
+                <section class="profile-section">
+                    <h2 class="section-title">Grant Range</h2>
+                    <div class="grant-range-card">
+                        <div class="range-info">
+                            <div class="range-endpoints">
+                                <div class="range-item">
+                                    <span class="range-label">Minimum</span>
+                                    <span class="range-value min" id="range-min">$0</span>
+                                </div>
+                                <div class="range-item">
+                                    <span class="range-label">Maximum</span>
+                                    <span class="range-value max" id="range-max">$0</span>
+                                </div>
+                            </div>
+                            <div class="range-bar-container">
+                                <div class="range-markers">
+                                    <div class="range-marker">
+                                        <div class="range-marker-label" id="marker-min">$0</div>
+                                        <div class="range-marker-dot"></div>
+                                    </div>
+                                    <div class="range-marker middle">
+                                        <div class="range-marker-label" id="marker-median">$0</div>
+                                        <div class="range-marker-dot"></div>
+                                    </div>
+                                    <div class="range-marker">
+                                        <div class="range-marker-label" id="marker-max">$0</div>
+                                        <div class="range-marker-dot"></div>
+                                    </div>
+                                </div>
+                                <div class="range-bar-track">
+                                    <div class="range-bar"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="range-detail">
+                            <span class="detail-badge">Median: <strong id="range-median-badge">$0</strong></span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Geographic Reach - US Map -->
+                <section class="profile-section">
+                    <h2 class="section-title">Geographic Reach</h2>
+                    <div class="map-card">
+                        <div id="us-map-container">
+                            <svg id="us-map" viewBox="0 0 960 600"></svg>
+                        </div>
+                        <div id="map-tooltip" class="map-tooltip"></div>
+                        <div class="map-legend">
+                            <div class="legend-title">Number of Grants</div>
+                            <div class="legend-scale">
+                                <div class="legend-gradient"></div>
+                                <div class="legend-labels">
+                                    <span>0</span>
+                                    <span id="legend-max">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- State Statistics Table -->
+                <section class="profile-section">
+                    <h2 class="section-title">State-by-State Breakdown</h2>
+                    <div class="table-card">
+                        <table class="stats-table">
+                            <thead>
+                                <tr>
+                                    <th>State</th>
+                                    <th>Grants</th>
+                                    <th>Total Amount</th>
+                                    <th>Avg Grant</th>
+                                    <th>Median Grant</th>
+                                </tr>
+                            </thead>
+                            <tbody id="states-table-body">
+                                <!-- Will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Focus Areas -->
+                <section class="profile-section">
+                    <h2 class="section-title">Focus Areas</h2>
+                    <div class="focus-areas-card">
+                        <div id="focus-areas-container">
+                            <!-- Will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Top Grants -->
+                <section class="profile-section">
+                    <h2 class="section-title">Largest Grants</h2>
+                    <div class="grants-showcase" id="top-grants-container">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+                </section>
+
+                <!-- Recent Grants -->
+                <section class="profile-section">
+                    <h2 class="section-title">Recent Grants</h2>
+                    <div class="grants-showcase" id="recent-grants-container">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>Data sourced from IRS Form 990 filings | Grant Finder &copy; 2025</p>
+        </div>
+    </footer>
+
+    <script>
+        const foundationEIN = {{ ein }};
+        let foundationData = null;
+
+        // Load foundation data
+        async function loadFoundationData() {
+            try {
+                const response = await fetch(`/api/foundation/${foundationEIN}/stats`);
+                if (!response.ok) {
+                    throw new Error('Foundation not found');
+                }
+                foundationData = await response.json();
+                displayFoundationData();
+            } catch (error) {
+                console.error('Error loading foundation data:', error);
+                document.getElementById('profile-loading').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <h3>Foundation Not Found</h3>
+                        <p>The foundation you're looking for could not be found.</p>
+                        <a href="/" class="btn-primary" style="margin-top: 20px; display: inline-block;">Back to Search</a>
+                    </div>
+                `;
+            }
+        }
+
+        function displayFoundationData() {
+            // Hide loading, show content
+            document.getElementById('profile-loading').style.display = 'none';
+            document.getElementById('profile-content').style.display = 'block';
+
+            // Update header
+            document.getElementById('foundation-name').textContent = foundationData.foundation_name;
+            
+            // Update primary state
+            if (foundationData.primary_state) {
+                document.getElementById('primary-state-value').textContent = foundationData.primary_state;
+                document.getElementById('primary-state-display').style.display = 'flex';
+            }
+
+            // Update stats
+            document.getElementById('stat-grant-count').textContent = foundationData.grant_count.toLocaleString();
+            document.getElementById('stat-total-amount').textContent = `$${formatLargeNumber(foundationData.total_amount)}`;
+            document.getElementById('stat-median').textContent = `$${foundationData.median_grant.toLocaleString()}`;
+            document.getElementById('stat-average').textContent = `$${foundationData.avg_grant.toLocaleString()}`;
+
+            // Update grant range
+            document.getElementById('range-min').textContent = `$${formatNumber(foundationData.min_grant)}`;
+            document.getElementById('range-max').textContent = `$${formatNumber(foundationData.max_grant)}`;
+            document.getElementById('marker-min').textContent = `$${formatNumber(foundationData.min_grant)}`;
+            document.getElementById('marker-median').textContent = `$${formatNumber(foundationData.median_grant)}`;
+            document.getElementById('marker-max').textContent = `$${formatNumber(foundationData.max_grant)}`;
+            document.getElementById('range-median-badge').textContent = `$${formatNumber(foundationData.median_grant)}`;
+
+            // Display US map
+            displayUSMap(foundationData.states_data);
+
+            // Display state statistics table
+            displayStatesTable(foundationData.states_data);
+
+            // Display focus areas
+            displayFocusAreas(foundationData.top_purposes);
+
+            // Display top grants
+            displayGrants(foundationData.top_grants, 'top-grants-container');
+
+            // Display recent grants
+            displayGrants(foundationData.recent_grants, 'recent-grants-container');
+        }
+
+        async function displayUSMap(statesData) {
+            // Create a map of state codes to data
+            const stateMap = {};
+            statesData.forEach(state => {
+                stateMap[state.state] = state;
+            });
+
+            const maxGrants = Math.max(...statesData.map(s => s.grant_count), 1);
+            document.getElementById('legend-max').textContent = maxGrants;
+
+            // Color scale with nicer colors
+            const colorScale = d3.scaleSequential()
+                .domain([0, maxGrants])
+                .interpolator(t => {
+                    if (t === 0) return '#e8eaed';
+                    // Gradient from sea foam green to periwinkle to orange
+                    if (t < 0.5) {
+                        return d3.interpolate('#09cfaf', '#5555e7')(t * 2);
+                    } else {
+                        return d3.interpolate('#5555e7', '#ffb424')((t - 0.5) * 2);
+                    }
+                });
+
+            const svg = d3.select('#us-map');
+            const tooltip = d3.select('#map-tooltip');
+
+            // Clear existing content
+            svg.selectAll('*').remove();
+
+            // Load US states TopoJSON data
+            const us = await d3.json('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json');
+            const states = topojson.feature(us, us.objects.states);
+
+            // Set up dimensions and projection
+            const width = 960;
+            const height = 600;
+            
+            const projection = d3.geoAlbersUsa()
+                .scale(1200)
+                .translate([width / 2, height / 2]);
+
+            const path = d3.geoPath().projection(projection);
+
+            // Set SVG viewBox
+            svg.attr('viewBox', `0 0 ${width} ${height}`)
+               .attr('preserveAspectRatio', 'xMidYMid meet');
+
+            // State ID to abbreviation mapping
+            const stateIdToAbbr = {
+                '01': 'AL', '02': 'AK', '04': 'AZ', '05': 'AR', '06': 'CA', '08': 'CO', '09': 'CT', '10': 'DE',
+                '11': 'DC', '12': 'FL', '13': 'GA', '15': 'HI', '16': 'ID', '17': 'IL', '18': 'IN', '19': 'IA',
+                '20': 'KS', '21': 'KY', '22': 'LA', '23': 'ME', '24': 'MD', '25': 'MA', '26': 'MI', '27': 'MN',
+                '28': 'MS', '29': 'MO', '30': 'MT', '31': 'NE', '32': 'NV', '33': 'NH', '34': 'NJ', '35': 'NM',
+                '36': 'NY', '37': 'NC', '38': 'ND', '39': 'OH', '40': 'OK', '41': 'OR', '42': 'PA', '44': 'RI',
+                '45': 'SC', '46': 'SD', '47': 'TN', '48': 'TX', '49': 'UT', '50': 'VT', '51': 'VA', '53': 'WA',
+                '54': 'WV', '55': 'WI', '56': 'WY'
+            };
+
+            // Draw states
+            svg.append('g')
+                .selectAll('path')
+                .data(states.features)
+                .join('path')
+                .attr('d', path)
+                .attr('class', 'state')
+                .attr('fill', d => {
+                    const stateId = d.id.toString().padStart(2, '0');
+                    const stateAbbr = stateIdToAbbr[stateId];
+                    const data = stateMap[stateAbbr];
+                    return data ? colorScale(data.grant_count) : '#f5f5f5';
+                })
+                .attr('stroke', '#ffffff')
+                .attr('stroke-width', 1.5)
+                .attr('stroke-linejoin', 'round')
+                .style('cursor', d => {
+                    const stateId = d.id.toString().padStart(2, '0');
+                    const stateAbbr = stateIdToAbbr[stateId];
+                    return stateMap[stateAbbr] ? 'pointer' : 'default';
+                })
+                .on('mouseover', function(event, d) {
+                    const stateId = d.id.toString().padStart(2, '0');
+                    const stateAbbr = stateIdToAbbr[stateId];
+                    const data = stateMap[stateAbbr];
+                    
+                    if (data) {
+                        d3.select(this)
+                            .attr('stroke', '#0f0e5b')
+                            .attr('stroke-width', 2.5)
+                            .raise();
+                        
+                        tooltip.style('display', 'block')
+                            .style('left', (event.pageX + 10) + 'px')
+                            .style('top', (event.pageY - 10) + 'px')
+                            .html(`
+                                <div style="font-weight: 700; margin-bottom: 4px; font-size: 14px;">${stateAbbr}</div>
+                                <div>Grants: <strong>${data.grant_count.toLocaleString()}</strong></div>
+                                <div>Total: <strong>$${formatLargeNumber(data.total_amount)}</strong></div>
+                                <div>Avg: <strong>$${formatNumber(data.avg_grant)}</strong></div>
+                                <div>Median: <strong>$${formatNumber(data.median_grant)}</strong></div>
+                            `);
+                    }
+                })
+                .on('mouseout', function(event, d) {
+                    d3.select(this)
+                        .attr('stroke', '#ffffff')
+                        .attr('stroke-width', 1.5);
+                    tooltip.style('display', 'none');
+                });
+
+            // Add state labels for states with grants
+            const labelGroup = svg.append('g')
+                .attr('class', 'state-labels');
+
+            states.features.forEach(feature => {
+                const stateId = feature.id.toString().padStart(2, '0');
+                const stateAbbr = stateIdToAbbr[stateId];
+                const data = stateMap[stateAbbr];
+                
+                if (data && data.grant_count > 0) {
+                    const centroid = path.centroid(feature);
+                    if (!isNaN(centroid[0]) && !isNaN(centroid[1])) {
+                        // Add state abbreviation
+                        labelGroup.append('text')
+                            .attr('x', centroid[0])
+                            .attr('y', centroid[1] - 5)
+                            .attr('text-anchor', 'middle')
+                            .attr('font-size', '11px')
+                            .attr('font-weight', '700')
+                            .attr('fill', '#ffffff')
+                            .attr('pointer-events', 'none')
+                            .style('text-shadow', '0 1px 3px rgba(0, 0, 0, 0.3)')
+                            .text(stateAbbr);
+                        
+                        // Add grant count
+                        labelGroup.append('text')
+                            .attr('x', centroid[0])
+                            .attr('y', centroid[1] + 8)
+                            .attr('text-anchor', 'middle')
+                            .attr('font-size', '10px')
+                            .attr('font-weight', '600')
+                            .attr('fill', 'rgba(255, 255, 255, 0.95)')
+                            .attr('pointer-events', 'none')
+                            .style('text-shadow', '0 1px 2px rgba(0, 0, 0, 0.3)')
+                            .text(data.grant_count);
+                    }
+                }
+            });
+        }
+
+        function displayStatesTable(statesData) {
+            const tbody = document.getElementById('states-table-body');
+            tbody.innerHTML = '';
+
+            statesData.forEach(state => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><strong>${state.state}</strong></td>
+                    <td>${state.grant_count.toLocaleString()}</td>
+                    <td>$${formatLargeNumber(state.total_amount)}</td>
+                    <td>$${formatNumber(state.avg_grant)}</td>
+                    <td>$${formatNumber(state.median_grant)}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function displayFocusAreas(topPurposes) {
+            const container = document.getElementById('focus-areas-container');
+            container.innerHTML = '';
+
+            if (topPurposes.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-medium);">No focus areas specified</p>';
+                return;
+            }
+
+            topPurposes.forEach(purpose => {
+                const tag = document.createElement('span');
+                tag.className = 'purpose-tag-large';
+                tag.textContent = purpose;
+                container.appendChild(tag);
+            });
+        }
+
+        function displayGrants(grants, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+
+            if (grants.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-medium);">No grants available</p>';
+                return;
+            }
+
+            grants.forEach(grant => {
+                const card = document.createElement('div');
+                card.className = 'grant-showcase-card';
+
+                const location = [grant.recipient_city, grant.recipient_state]
+                    .filter(Boolean)
+                    .join(', ') || 'Location not specified';
+
+                card.innerHTML = `
+                    <div class="grant-showcase-amount">$${grant.grant_amount.toLocaleString()}</div>
+                    <div class="grant-showcase-recipient">${escapeHtml(grant.recipient_name)}</div>
+                    <div class="grant-showcase-location">${escapeHtml(location)}</div>
+                    <div class="grant-showcase-purpose">${escapeHtml(grant.grant_purpose)}</div>
+                    ${grant.tax_period ? `<div class="grant-showcase-period">${escapeHtml(grant.tax_period)}</div>` : ''}
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // Utility functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatLargeNumber(num) {
+            if (num >= 1000000) {
+                return (num / 1000000).toFixed(1) + 'M';
+            } else if (num >= 1000) {
+                return (num / 1000).toFixed(1) + 'K';
+            }
+            return num.toLocaleString();
+        }
+
+        function formatNumber(num) {
+            if (num >= 1000000) {
+                return (num / 1000000).toFixed(1) + 'M';
+            } else if (num >= 1000) {
+                return (num / 1000).toFixed(0) + 'K';
+            }
+            return num.toLocaleString();
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', loadFoundationData);
+    </script>
+</body>
+</html>
+
