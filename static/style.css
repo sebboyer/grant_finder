@@ -50,31 +50,11 @@ body {
 
 /* Header */
 header {
-    background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-blue) 100%);
+    background: var(--primary-color);
     padding: 24px 0 32px;
     box-shadow: var(--shadow-sm);
     position: relative;
     overflow: hidden;
-}
-
-header::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.05) 0%, transparent 70%);
-    animation: headerShine 15s ease-in-out infinite;
-}
-
-@keyframes headerShine {
-    0%, 100% {
-        transform: translate(0, 0);
-    }
-    50% {
-        transform: translate(10%, 10%);
-    }
 }
 
 .header-content {
@@ -160,24 +140,14 @@ main {
 
 /* Search Section */
 .search-section {
-    background: linear-gradient(135deg, rgba(85, 85, 231, 0.03) 0%, rgba(27, 27, 181, 0.04) 100%);
+    background: var(--white);
     border-radius: var(--border-radius);
     padding: 32px;
     margin-bottom: 32px;
-    box-shadow: 0 4px 16px rgba(85, 85, 231, 0.08);
-    border: 1px solid rgba(85, 85, 231, 0.15);
+    box-shadow: var(--shadow-md);
+    border: 2px solid var(--primary-color);
     position: relative;
     overflow: hidden;
-}
-
-.search-section::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--primary-color), var(--secondary-color), var(--accent-orange));
 }
 
 .search-header {
@@ -360,33 +330,16 @@ main {
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-blue) 100%);
+    background: var(--primary-color);
     color: var(--white);
     flex: 1;
-    position: relative;
-    overflow: hidden;
-    box-shadow: 0 4px 12px rgba(85, 85, 231, 0.25);
-}
-
-.btn-primary::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transition: left 0.5s;
-}
-
-.btn-primary:hover::before {
-    left: 100%;
+    box-shadow: 0 2px 8px rgba(85, 85, 231, 0.2);
 }
 
 .btn-primary:hover {
-    background: linear-gradient(135deg, var(--primary-hover) 0%, var(--accent-blue) 100%);
+    background: var(--primary-hover);
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(85, 85, 231, 0.35);
+    box-shadow: 0 4px 12px rgba(85, 85, 231, 0.3);
 }
 
 .btn-primary:active {
@@ -451,17 +404,20 @@ main {
 /* Grants Grid */
 .grants-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
     gap: 20px;
 }
 
 .grant-card {
     background-color: var(--white);
     border-radius: var(--border-radius);
-    padding: 20px;
+    padding: 24px;
     box-shadow: var(--shadow-sm);
     transition: all 0.2s;
     border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    height: 380px;
 }
 
 .grant-card:hover {
@@ -471,11 +427,12 @@ main {
 }
 
 .grant-header {
-    margin-bottom: 14px;
+    margin-bottom: 16px;
+    flex-shrink: 0;
 }
 
 .grant-amount {
-    font-size: 26px;
+    font-size: 28px;
     font-weight: 700;
     color: var(--primary-color);
     margin-bottom: 8px;
@@ -503,18 +460,22 @@ main {
     -webkit-box-orient: vertical;
     overflow: hidden;
     line-height: 1.4;
+    min-height: 42px;
 }
 
 .grant-divider {
     height: 1px;
     background-color: var(--border-color);
-    margin: 14px 0;
+    margin: 0 0 16px 0;
+    flex-shrink: 0;
 }
 
 .grant-details {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
+    flex: 1;
+    min-height: 0;
 }
 
 .grant-detail-row {
@@ -528,23 +489,29 @@ main {
     font-weight: 600;
     color: var(--text-medium);
     min-width: 70px;
+    flex-shrink: 0;
 }
 
 .detail-value {
     font-size: 13px;
     color: var(--text-dark);
     flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .grant-purpose {
     font-size: 13px;
     color: var(--text-medium);
-    margin-top: 12px;
+    margin-top: auto;
+    padding-top: 12px;
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
     line-height: 1.5;
+    flex-shrink: 0;
+    min-height: 60px;
 }
 
 .location-tag {
@@ -579,8 +546,8 @@ main {
 /* Foundation Grid */
 .foundations-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-    gap: 24px;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px;
 }
 
 .foundation-card {
@@ -590,10 +557,14 @@ main {
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--border-color);
     transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    height: 520px;
 }
 
 .foundation-card:hover {
     box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
     border-color: var(--primary-color);
 }
 
@@ -611,6 +582,7 @@ main {
 
 .foundation-header {
     margin-bottom: 16px;
+    flex-shrink: 0;
 }
 
 .foundation-name {
@@ -619,6 +591,11 @@ main {
     color: var(--text-dark);
     margin-bottom: 6px;
     line-height: 1.3;
+    min-height: 46px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .foundation-ein {
@@ -631,8 +608,8 @@ main {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    margin-top: 6px;
-    padding: 4px 10px;
+    margin-top: 8px;
+    padding: 5px 12px;
     background: var(--secondary-color);
     border-radius: 12px;
     font-size: 10px;
@@ -657,11 +634,12 @@ main {
 .foundation-stats {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    gap: 12px;
     margin: 16px 0;
     padding: 16px;
     background-color: var(--background-light);
     border-radius: 8px;
+    flex-shrink: 0;
 }
 
 .stat {
@@ -679,9 +657,12 @@ main {
 }
 
 .stat-value {
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 700;
     color: var(--primary-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .foundation-stats .stat:nth-child(1) .stat-value {
@@ -701,26 +682,32 @@ main {
 }
 
 .foundation-details {
-    margin: 16px 0;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
 .detail-item {
     font-size: 13px;
     color: var(--text-dark);
-    margin-bottom: 8px;
     line-height: 1.5;
 }
 
 .detail-item strong {
     color: var(--text-medium);
     font-weight: 600;
+    display: block;
+    margin-bottom: 6px;
 }
 
 .state-badge {
     display: inline-block;
     background-color: var(--white);
     border: 1px solid var(--border-color);
-    padding: 3px 8px;
+    padding: 4px 10px;
     border-radius: 6px;
     font-size: 11px;
     font-weight: 600;
@@ -757,7 +744,7 @@ main {
     display: inline-block;
     background-color: var(--secondary-color);
     color: var(--white);
-    padding: 4px 10px;
+    padding: 5px 12px;
     border-radius: 6px;
     font-size: 11px;
     font-weight: 600;
@@ -776,26 +763,26 @@ main {
 
 .expand-grants-btn {
     width: 100%;
-    padding: 10px;
+    padding: 12px;
     background-color: var(--primary-color);
     border: 1px solid var(--primary-color);
     border-radius: 8px;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     color: var(--white);
     cursor: pointer;
     transition: all 0.2s;
-    margin-top: 12px;
+    margin-top: 16px;
     font-family: 'Poppins', sans-serif;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
+    flex-shrink: 0;
 }
 
 .expand-grants-btn:hover {
     background-color: var(--primary-hover);
-    transform: translateY(-1px);
     box-shadow: var(--shadow-md);
 }
 
@@ -896,8 +883,18 @@ footer {
         grid-template-columns: 1fr;
     }
 
+    .grant-card {
+        height: auto;
+        min-height: 380px;
+    }
+
     .foundations-grid {
         grid-template-columns: 1fr;
+    }
+
+    .foundation-card {
+        height: auto;
+        min-height: 520px;
     }
 
     .foundation-stats {
@@ -922,6 +919,7 @@ footer {
 
     .search-section {
         padding: 24px 18px;
+        border: 1px solid var(--primary-color);
     }
     
     .filter-actions {
@@ -942,6 +940,10 @@ footer {
 @media (min-width: 1024px) {
     .grants-grid {
         grid-template-columns: repeat(3, 1fr);
+    }
+
+    .foundations-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 
@@ -1541,5 +1543,258 @@ footer {
 
     .grant-range-card {
         padding: 24px 16px;
+    }
+}
+
+/* ============================================
+   ENHANCED FOUNDATION PROFILE STYLES
+   ============================================ */
+
+/* Header Enhancements */
+.foundation-header-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    margin-bottom: 16px;
+}
+
+.foundation-header-text {
+    flex: 1;
+}
+
+.foundation-header-badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+}
+
+.foundation-badge {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: help;
+}
+
+.badge-501c3 {
+    background: linear-gradient(135deg, #09cfaf 0%, #00b89c 100%);
+    color: white;
+}
+
+.badge-operating {
+    background: linear-gradient(135deg, #ffb424 0%, #ff9500 100%);
+    color: white;
+}
+
+.badge-grantmaking {
+    background: linear-gradient(135deg, #5555e7 0%, #4444d8 100%);
+    color: white;
+}
+
+/* Quick Contact Bar in Header */
+.foundation-quick-contact {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 12px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 12px;
+    font-size: 14px;
+}
+
+.quick-contact-link {
+    color: rgba(255, 255, 255, 0.95);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.quick-contact-link:hover {
+    color: #09cfaf;
+}
+
+.quick-contact-text {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.contact-separator {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+/* About Section */
+.foundation-about .about-card {
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.about-content {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.about-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 24px;
+}
+
+.about-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.about-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.about-value {
+    font-size: 16px;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.mission-text {
+    line-height: 1.6;
+    font-size: 15px;
+    color: var(--text-primary);
+    font-weight: 400;
+}
+
+/* Two Column Layout for Contact & Financial */
+.two-column-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+/* Contact Section */
+.contact-card {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.contact-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.contact-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.contact-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.contact-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.contact-value {
+    font-size: 15px;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+.contact-link {
+    color: var(--accent-seafoam);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.contact-link:hover {
+    color: var(--accent-periwinkle);
+}
+
+/* Financial Section */
+.financial-card {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.financial-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.financial-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.financial-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Responsive Design for New Sections */
+@media (max-width: 1024px) {
+    .two-column-section {
+        grid-template-columns: 1fr;
+    }
+    
+    .foundation-header-main {
+        flex-direction: column;
+    }
+    
+    .foundation-header-badges {
+        width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .about-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .financial-card {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .about-card, .contact-card, .financial-card {
+        padding: 20px;
+    }
+    
+    .foundation-quick-contact {
+        gap: 12px;
+        font-size: 13px;
     }
 }

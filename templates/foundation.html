@@ -18,12 +18,22 @@
                 <a href="/" class="back-link">← Back to Search</a>
             </div>
             <div id="foundation-header">
-                <h1 id="foundation-name">Loading...</h1>
-                <p class="foundation-ein-display" id="foundation-ein">EIN: {{ ein }}</p>
-                <div id="primary-state-display" class="primary-state-display" style="display: none;">
-                    <span class="primary-state-icon">📍</span>
-                    <span class="primary-state-label">Primary State of Activity:</span>
-                    <span class="primary-state-value" id="primary-state-value"></span>
+                <div class="foundation-header-main">
+                    <div class="foundation-header-text">
+                        <h1 id="foundation-name">Loading...</h1>
+                        <p class="foundation-ein-display" id="foundation-ein">EIN: {{ ein }}</p>
+                        <div id="primary-state-display" class="primary-state-display" style="display: none;">
+                            <span class="primary-state-icon">📍</span>
+                            <span class="primary-state-label">Primary Grant Activity:</span>
+                            <span class="primary-state-value" id="primary-state-value"></span>
+                        </div>
+                    </div>
+                    <div class="foundation-header-badges" id="foundation-badges">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+                </div>
+                <div class="foundation-quick-contact" id="quick-contact" style="display: none;">
+                    <!-- Will be populated by JavaScript -->
                 </div>
             </div>
         </div>
@@ -37,6 +47,95 @@
             </div>
 
             <div id="profile-content" style="display: none;">
+                <!-- Foundation About Section -->
+                <section class="profile-section foundation-about" id="about-section" style="display: none;">
+                    <h2 class="section-title">About This Foundation</h2>
+                    <div class="about-card">
+                        <div class="about-content">
+                            <div class="about-item" id="mission-item" style="display: none;">
+                                <div class="about-label">Mission</div>
+                                <div class="about-value mission-text" id="mission-text"></div>
+                            </div>
+                            <div class="about-grid">
+                                <div class="about-item" id="formation-item" style="display: none;">
+                                    <div class="about-label">Established</div>
+                                    <div class="about-value" id="formation-year"></div>
+                                </div>
+                                <div class="about-item" id="foundation-type-item" style="display: none;">
+                                    <div class="about-label">Foundation Type</div>
+                                    <div class="about-value" id="foundation-type"></div>
+                                </div>
+                                <div class="about-item" id="domicile-item" style="display: none;">
+                                    <div class="about-label">Legal Domicile</div>
+                                    <div class="about-value" id="legal-domicile"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Contact & Financial Overview Section -->
+                <div class="two-column-section">
+                    <!-- Contact Information -->
+                    <section class="profile-section contact-section" id="contact-section" style="display: none;">
+                        <h2 class="section-title">Contact Information</h2>
+                        <div class="contact-card">
+                            <div class="contact-item" id="website-item" style="display: none;">
+                                <div class="contact-icon">🌐</div>
+                                <div class="contact-details">
+                                    <div class="contact-label">Website</div>
+                                    <a href="" id="website-link" target="_blank" rel="noopener noreferrer" class="contact-value contact-link"></a>
+                                </div>
+                            </div>
+                            <div class="contact-item" id="phone-item" style="display: none;">
+                                <div class="contact-icon">📞</div>
+                                <div class="contact-details">
+                                    <div class="contact-label">Phone</div>
+                                    <a href="" id="phone-link" class="contact-value contact-link"></a>
+                                </div>
+                            </div>
+                            <div class="contact-item" id="address-item" style="display: none;">
+                                <div class="contact-icon">📍</div>
+                                <div class="contact-details">
+                                    <div class="contact-label">Address</div>
+                                    <div class="contact-value" id="address-text"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Financial Overview -->
+                    <section class="profile-section financial-section" id="financial-section" style="display: none;">
+                        <h2 class="section-title">Financial Overview</h2>
+                        <div class="financial-card">
+                            <div class="financial-item" id="assets-item" style="display: none;">
+                                <div class="financial-label">Total Assets</div>
+                                <div class="financial-value" id="total-assets"></div>
+                            </div>
+                            <div class="financial-item" id="fmv-item" style="display: none;">
+                                <div class="financial-label">Fair Market Value</div>
+                                <div class="financial-value" id="fair-market-value"></div>
+                            </div>
+                            <div class="financial-item" id="revenue-item" style="display: none;">
+                                <div class="financial-label">Annual Revenue</div>
+                                <div class="financial-value" id="total-revenue"></div>
+                            </div>
+                            <div class="financial-item" id="expenses-item" style="display: none;">
+                                <div class="financial-label">Annual Expenses</div>
+                                <div class="financial-value" id="total-expenses"></div>
+                            </div>
+                            <div class="financial-item" id="distributions-item" style="display: none;">
+                                <div class="financial-label">Distributions Paid</div>
+                                <div class="financial-value" id="total-distributions"></div>
+                            </div>
+                            <div class="financial-item" id="investment-item" style="display: none;">
+                                <div class="financial-label">Investment Income</div>
+                                <div class="financial-value" id="investment-income"></div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
                 <!-- Key Stats Section -->
                 <section class="profile-section stats-overview">
                     <div class="stats-grid">
@@ -229,6 +328,21 @@
                 document.getElementById('primary-state-display').style.display = 'flex';
             }
 
+            // Display header badges (foundation type, 501c3 status)
+            displayHeaderBadges();
+            
+            // Display quick contact info in header
+            displayQuickContact();
+            
+            // Display About section
+            displayAboutSection();
+            
+            // Display Contact section
+            displayContactSection();
+            
+            // Display Financial section
+            displayFinancialSection();
+
             // Update stats
             document.getElementById('stat-grant-count').textContent = foundationData.grant_count.toLocaleString();
             document.getElementById('stat-total-amount').textContent = `$${formatLargeNumber(foundationData.total_amount)}`;
@@ -257,6 +371,209 @@
 
             // Display recent grants
             displayGrants(foundationData.recent_grants, 'recent-grants-container');
+        }
+
+        function displayHeaderBadges() {
+            const badgesContainer = document.getElementById('foundation-badges');
+            badgesContainer.innerHTML = '';
+            
+            // 501(c)(3) badge
+            if (foundationData.is_501c3) {
+                const badge = document.createElement('span');
+                badge.className = 'foundation-badge badge-501c3';
+                badge.textContent = '501(c)(3)';
+                badge.title = 'Tax-exempt public charity or private foundation';
+                badgesContainer.appendChild(badge);
+            }
+            
+            // Foundation type badge
+            if (foundationData.is_private_operating_foundation) {
+                const badge = document.createElement('span');
+                badge.className = 'foundation-badge badge-operating';
+                badge.textContent = 'Operating Foundation';
+                badge.title = 'Runs its own programs rather than making grants';
+                badgesContainer.appendChild(badge);
+            } else {
+                const badge = document.createElement('span');
+                badge.className = 'foundation-badge badge-grantmaking';
+                badge.textContent = 'Grant-Making Foundation';
+                badge.title = 'Primarily makes grants to other organizations';
+                badgesContainer.appendChild(badge);
+            }
+        }
+
+        function displayQuickContact() {
+            const quickContact = document.getElementById('quick-contact');
+            const items = [];
+            
+            if (foundationData.foundation_website) {
+                items.push(`<a href="${formatWebsiteURL(foundationData.foundation_website)}" target="_blank" rel="noopener noreferrer" class="quick-contact-link">🌐 ${foundationData.foundation_website}</a>`);
+            }
+            
+            if (foundationData.foundation_phone) {
+                const formattedPhone = formatPhoneNumber(foundationData.foundation_phone);
+                items.push(`<a href="tel:${foundationData.foundation_phone}" class="quick-contact-link">📞 ${formattedPhone}</a>`);
+            }
+            
+            if (foundationData.foundation_city && foundationData.foundation_state) {
+                items.push(`<span class="quick-contact-text">📍 ${foundationData.foundation_city}, ${foundationData.foundation_state}</span>`);
+            }
+            
+            if (items.length > 0) {
+                quickContact.innerHTML = items.join('<span class="contact-separator">•</span>');
+                quickContact.style.display = 'flex';
+            }
+        }
+
+        function displayAboutSection() {
+            let hasContent = false;
+            
+            // Mission
+            if (foundationData.mission && foundationData.mission.trim()) {
+                document.getElementById('mission-text').textContent = foundationData.mission;
+                document.getElementById('mission-item').style.display = 'block';
+                hasContent = true;
+            }
+            
+            // Formation year
+            if (foundationData.formation_year) {
+                const year = parseInt(foundationData.formation_year);
+                const age = new Date().getFullYear() - year;
+                document.getElementById('formation-year').textContent = `${year} (${age} years ago)`;
+                document.getElementById('formation-item').style.display = 'block';
+                hasContent = true;
+            }
+            
+            // Foundation type
+            if (foundationData.is_private_operating_foundation !== undefined) {
+                const type = foundationData.is_private_operating_foundation ? 
+                    'Private Operating Foundation' : 'Private Grant-Making Foundation';
+                document.getElementById('foundation-type').textContent = type;
+                document.getElementById('foundation-type-item').style.display = 'block';
+                hasContent = true;
+            }
+            
+            // Legal domicile
+            if (foundationData.legal_domicile_state) {
+                document.getElementById('legal-domicile').textContent = foundationData.legal_domicile_state;
+                document.getElementById('domicile-item').style.display = 'block';
+                hasContent = true;
+            }
+            
+            if (hasContent) {
+                document.getElementById('about-section').style.display = 'block';
+            }
+        }
+
+        function displayContactSection() {
+            let hasContent = false;
+            
+            // Website
+            if (foundationData.foundation_website) {
+                const url = formatWebsiteURL(foundationData.foundation_website);
+                document.getElementById('website-link').href = url;
+                document.getElementById('website-link').textContent = foundationData.foundation_website;
+                document.getElementById('website-item').style.display = 'flex';
+                hasContent = true;
+            }
+            
+            // Phone
+            if (foundationData.foundation_phone) {
+                const formatted = formatPhoneNumber(foundationData.foundation_phone);
+                document.getElementById('phone-link').href = `tel:${foundationData.foundation_phone}`;
+                document.getElementById('phone-link').textContent = formatted;
+                document.getElementById('phone-item').style.display = 'flex';
+                hasContent = true;
+            }
+            
+            // Address
+            if (foundationData.foundation_address || foundationData.foundation_city) {
+                const parts = [];
+                if (foundationData.foundation_address) parts.push(foundationData.foundation_address);
+                if (foundationData.foundation_address2) parts.push(foundationData.foundation_address2);
+                
+                const cityState = [foundationData.foundation_city, foundationData.foundation_state].filter(Boolean).join(', ');
+                if (cityState) parts.push(cityState);
+                if (foundationData.foundation_zip) parts.push(foundationData.foundation_zip);
+                
+                if (parts.length > 0) {
+                    document.getElementById('address-text').innerHTML = parts.join('<br>');
+                    document.getElementById('address-item').style.display = 'flex';
+                    hasContent = true;
+                }
+            }
+            
+            if (hasContent) {
+                document.getElementById('contact-section').style.display = 'block';
+            }
+        }
+
+        function displayFinancialSection() {
+            let hasContent = false;
+            
+            // Total Assets
+            if (foundationData.total_assets && foundationData.total_assets > 0) {
+                document.getElementById('total-assets').textContent = `$${formatLargeNumber(foundationData.total_assets)}`;
+                document.getElementById('assets-item').style.display = 'block';
+                hasContent = true;
+            }
+            
+            // Fair Market Value
+            if (foundationData.fair_market_value && foundationData.fair_market_value > 0) {
+                document.getElementById('fair-market-value').textContent = `$${formatLargeNumber(foundationData.fair_market_value)}`;
+                document.getElementById('fmv-item').style.display = 'block';
+                hasContent = true;
+            }
+            
+            // Revenue
+            if (foundationData.total_revenue && foundationData.total_revenue > 0) {
+                document.getElementById('total-revenue').textContent = `$${formatLargeNumber(foundationData.total_revenue)}`;
+                document.getElementById('revenue-item').style.display = 'block';
+                hasContent = true;
+            }
+            
+            // Expenses
+            if (foundationData.total_expenses && foundationData.total_expenses > 0) {
+                document.getElementById('total-expenses').textContent = `$${formatLargeNumber(foundationData.total_expenses)}`;
+                document.getElementById('expenses-item').style.display = 'block';
+                hasContent = true;
+            }
+            
+            // Distributions
+            if (foundationData.total_distributions_paid && foundationData.total_distributions_paid > 0) {
+                document.getElementById('total-distributions').textContent = `$${formatLargeNumber(foundationData.total_distributions_paid)}`;
+                document.getElementById('distributions-item').style.display = 'block';
+                hasContent = true;
+            }
+            
+            // Investment Income
+            if (foundationData.investment_income && foundationData.investment_income > 0) {
+                document.getElementById('investment-income').textContent = `$${formatLargeNumber(foundationData.investment_income)}`;
+                document.getElementById('investment-item').style.display = 'block';
+                hasContent = true;
+            }
+            
+            if (hasContent) {
+                document.getElementById('financial-section').style.display = 'block';
+            }
+        }
+
+        function formatWebsiteURL(url) {
+            if (!url) return '';
+            url = url.trim().toLowerCase();
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                return 'https://' + url;
+            }
+            return url;
+        }
+
+        function formatPhoneNumber(phone) {
+            if (!phone) return '';
+            const cleaned = phone.toString().replace(/\D/g, '');
+            if (cleaned.length === 10) {
+                return `(${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+            }
+            return phone;
         }
 
         async function displayUSMap(statesData) {

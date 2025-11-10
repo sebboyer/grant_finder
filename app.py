@@ -5,13 +5,25 @@ import os
 
 app = Flask(__name__)
 
-# Load the data
+# Load the grants data
 csv_path = os.path.join(os.path.dirname(__file__), 'grants_information_summary.csv')
 df = pd.read_csv(csv_path)
 
-# Data preprocessing
+# Load the foundations data
+foundations_csv_path = os.path.join(os.path.dirname(__file__), 'foundations_information_summary.csv')
+foundations_df = pd.read_csv(foundations_csv_path)
+
+# Data preprocessing for grants
 df['grant_amount'] = pd.to_numeric(df['grant_amount'], errors='coerce')
+df['cash_grant_amount'] = pd.to_numeric(df['cash_grant_amount'], errors='coerce')
+df['non_cash_grant_amount'] = pd.to_numeric(df['non_cash_grant_amount'], errors='coerce')
 df = df.dropna(subset=['grant_amount'])
+
+# Data preprocessing for foundations
+for col in ['total_assets_eoy', 'fair_market_value_eoy', 'total_revenue', 'total_expenses', 
+            'total_distributions', 'investment_income']:
+    if col in foundations_df.columns:
+        foundations_df[col] = pd.to_numeric(foundations_df[col], errors='coerce')
 
 # Create foundation-level aggregation
 print("Aggregating foundation data...")
@@ -40,6 +52,25 @@ def get_primary_state(ein):
     return ''
 
 foundations_agg['primary_state'] = foundations_agg['filer_ein'].apply(get_primary_state)
+
+# Merge foundation-level data from the foundations CSV
+print("Merging foundation-level metadata...")
+# Get the most recent record for each foundation (by tax_period_end)
+foundations_df['tax_period_end'] = pd.to_datetime(foundations_df['tax_period_end'], errors='coerce')
+foundations_latest = foundations_df.sort_values('tax_period_end').groupby('filer_ein').last().reset_index()
+
+# Merge foundation data into aggregation
+foundations_agg = foundations_agg.merge(
+    foundations_latest[[
+        'filer_ein', 'formation_year', 'foundation_address_line1', 'foundation_address_line2',
+        'foundation_city', 'foundation_state', 'foundation_zip', 'foundation_phone',
+        'foundation_website', 'legal_domicile_state', 'total_assets_eoy', 
+        'fair_market_value_eoy', 'total_revenue', 'total_expenses', 'total_distributions',
+        'investment_income', 'is_private_operating_foundation', 'is_501c3', 'mission_description'
+    ]],
+    on='filer_ein',
+    how='left'
+)
 
 # Convert to int where appropriate
 foundations_agg['grant_count'] = foundations_agg['grant_count'].astype(int)
@@ -130,7 +161,11 @@ def search_grants():
             'recipient_name': row['recipient_name'],
             'recipient_city': row['recipient_city'] if pd.notna(row['recipient_city']) else '',
             'recipient_state': row['recipient_state'] if pd.notna(row['recipient_state']) else '',
+            'recipient_relationship': row.get('recipient_relationship', '') if pd.notna(row.get('recipient_relationship')) else '',
+            'recipient_foundation_status': row.get('recipient_foundation_status', '') if pd.notna(row.get('recipient_foundation_status')) else '',
             'grant_amount': int(row['grant_amount']),
+            'cash_amount': int(row.get('cash_grant_amount', 0)) if pd.notna(row.get('cash_grant_amount')) else 0,
+            'non_cash_amount': int(row.get('non_cash_grant_amount', 0)) if pd.notna(row.get('non_cash_grant_amount')) else 0,
             'grant_purpose': row['grant_purpose'] if pd.notna(row['grant_purpose']) else 'No purpose specified',
             'tax_period': row['tax_period_end'] if pd.notna(row['tax_period_end']) else ''
         })
@@ -258,12 +293,24 @@ def get_foundation_detail(ein):
     for _, grant in foundation_grants.iterrows():
         grants.append({
             'recipient_name': grant['recipient_name'],
+            'recipient_ein': grant.get('recipient_ein', '') if pd.notna(grant.get('recipient_ein')) else '',
             'recipient_city': grant['recipient_city'] if pd.notna(grant['recipient_city']) else '',
             'recipient_state': grant['recipient_state'] if pd.notna(grant['recipient_state']) else '',
+            'recipient_relationship': grant.get('recipient_relationship', '') if pd.notna(grant.get('recipient_relationship')) else '',
+            'recipient_foundation_status': grant.get('recipient_foundation_status', '') if pd.notna(grant.get('recipient_foundation_status')) else '',
             'grant_amount': int(grant['grant_amount']),
+            'cash_amount': int(grant.get('cash_grant_amount', 0)) if pd.notna(grant.get('cash_grant_amount')) else 0,
+            'non_cash_amount': int(grant.get('non_cash_grant_amount', 0)) if pd.notna(grant.get('non_cash_grant_amount')) else 0,
             'grant_purpose': grant['grant_purpose'] if pd.notna(grant['grant_purpose']) else 'No purpose specified',
             'tax_period': grant['tax_period_end'] if pd.notna(grant['tax_period_end']) else ''
         })
+    
+    # Helper for safe value extraction
+    def safe_get(key, default=''):
+        val = foundation_row.get(key, default)
+        if pd.isna(val):
+            return default
+        return val
     
     return jsonify({
         'foundation_name': foundation_row['filer_organization_name'],
@@ -277,8 +324,13 @@ def get_foundation_detail(ein):
         'states_served': foundation_row['states_served'] if isinstance(foundation_row['states_served'], list) else [],
         'cities_served': foundation_row['cities_served'] if isinstance(foundation_row['cities_served'], list) else [],
         'top_purposes': foundation_row['top_purposes'] if isinstance(foundation_row['top_purposes'], list) else [],
-        'latest_period': foundation_row['latest_period'] if pd.notna(foundation_row['latest_period']) else '',
-        'primary_state': foundation_row['primary_state'] if pd.notna(foundation_row['primary_state']) else '',
+        'latest_period': safe_get('latest_period'),
+        'primary_state': safe_get('primary_state'),
+        # NEW: Foundation contact info
+        'foundation_website': safe_get('foundation_website'),
+        'foundation_phone': safe_get('foundation_phone'),
+        'foundation_city': safe_get('foundation_city'),
+        'foundation_state': safe_get('foundation_state'),
         'grants': grants
     })
 
@@ -351,6 +403,22 @@ def get_foundation_stats(ein):
             'tax_period': grant['tax_period_end'] if pd.notna(grant['tax_period_end']) else ''
         })
     
+    # Helper function to safely get values
+    def safe_get(key, default=''):
+        val = foundation_row.get(key, default)
+        if pd.isna(val):
+            return default
+        return val
+    
+    def safe_int(key, default=0):
+        val = foundation_row.get(key, default)
+        if pd.isna(val):
+            return default
+        try:
+            return int(val)
+        except (ValueError, TypeError):
+            return default
+    
     return jsonify({
         'foundation_name': foundation_row['filer_organization_name'],
         'foundation_ein': int(foundation_row['filer_ein']),
@@ -363,11 +431,30 @@ def get_foundation_stats(ein):
         'states_served': foundation_row['states_served'] if isinstance(foundation_row['states_served'], list) else [],
         'cities_served': foundation_row['cities_served'] if isinstance(foundation_row['cities_served'], list) else [],
         'top_purposes': foundation_row['top_purposes'] if isinstance(foundation_row['top_purposes'], list) else [],
-        'latest_period': foundation_row['latest_period'] if pd.notna(foundation_row['latest_period']) else '',
-        'primary_state': foundation_row['primary_state'] if pd.notna(foundation_row['primary_state']) else '',
+        'latest_period': safe_get('latest_period'),
+        'primary_state': safe_get('primary_state'),
         'states_data': states_data,
         'top_grants': top_grants_list,
-        'recent_grants': recent_grants_list
+        'recent_grants': recent_grants_list,
+        # NEW: Foundation-level information
+        'formation_year': safe_get('formation_year'),
+        'foundation_address': safe_get('foundation_address_line1'),
+        'foundation_address2': safe_get('foundation_address_line2'),
+        'foundation_city': safe_get('foundation_city'),
+        'foundation_state': safe_get('foundation_state'),
+        'foundation_zip': safe_get('foundation_zip'),
+        'foundation_phone': safe_get('foundation_phone'),
+        'foundation_website': safe_get('foundation_website'),
+        'legal_domicile_state': safe_get('legal_domicile_state'),
+        'total_assets': safe_int('total_assets_eoy'),
+        'fair_market_value': safe_int('fair_market_value_eoy'),
+        'total_revenue': safe_int('total_revenue'),
+        'total_expenses': safe_int('total_expenses'),
+        'total_distributions_paid': safe_int('total_distributions'),
+        'investment_income': safe_int('investment_income'),
+        'is_private_operating_foundation': safe_get('is_private_operating_foundation') in ['true', 'True', '1', 'X'],
+        'is_501c3': safe_get('is_501c3') in ['true', 'True', '1', 'X'],
+        'mission': safe_get('mission_description')
     })
 
 
