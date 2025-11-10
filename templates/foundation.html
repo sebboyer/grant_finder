@@ -136,6 +136,16 @@
                     </section>
                 </div>
 
+                <!-- Leadership & Board Section -->
+                <section class="profile-section leadership-section" id="leadership-section" style="display: none;">
+                    <h2 class="section-title">Leadership & Board</h2>
+                    <div class="leadership-card">
+                        <div class="officers-grid" id="officers-grid">
+                            <!-- Will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Key Stats Section -->
                 <section class="profile-section stats-overview">
                     <div class="stats-grid">
@@ -342,6 +352,9 @@
             
             // Display Financial section
             displayFinancialSection();
+            
+            // Display Leadership section
+            displayLeadershipSection();
 
             // Update stats
             document.getElementById('stat-grant-count').textContent = foundationData.grant_count.toLocaleString();
@@ -556,6 +569,78 @@
             if (hasContent) {
                 document.getElementById('financial-section').style.display = 'block';
             }
+        }
+
+        function displayLeadershipSection() {
+            const officers = foundationData.officers || [];
+            
+            if (officers.length === 0) {
+                return; // Don't show section if no officers
+            }
+            
+            const officersGrid = document.getElementById('officers-grid');
+            officersGrid.innerHTML = '';
+            
+            officers.forEach(officer => {
+                const officerCard = document.createElement('div');
+                officerCard.className = 'officer-card';
+                
+                // Create name and title section
+                const nameSection = document.createElement('div');
+                nameSection.className = 'officer-info';
+                
+                const name = document.createElement('div');
+                name.className = 'officer-name';
+                name.textContent = officer.name || 'Unknown';
+                
+                const title = document.createElement('div');
+                title.className = 'officer-title';
+                title.textContent = officer.title || 'Board Member';
+                
+                nameSection.appendChild(name);
+                nameSection.appendChild(title);
+                
+                // Create compensation section (only if paid)
+                if (officer.total_compensation && officer.total_compensation > 0) {
+                    const compSection = document.createElement('div');
+                    compSection.className = 'officer-compensation';
+                    
+                    const compAmount = document.createElement('div');
+                    compAmount.className = 'compensation-amount';
+                    compAmount.textContent = `$${officer.total_compensation.toLocaleString()}`;
+                    
+                    const compLabel = document.createElement('div');
+                    compLabel.className = 'compensation-label';
+                    compLabel.textContent = 'Annual Compensation';
+                    
+                    compSection.appendChild(compAmount);
+                    compSection.appendChild(compLabel);
+                    
+                    officerCard.appendChild(nameSection);
+                    officerCard.appendChild(compSection);
+                } else {
+                    // Just add name section for unpaid officers
+                    officerCard.appendChild(nameSection);
+                    
+                    // Add volunteer badge
+                    const volunteerBadge = document.createElement('div');
+                    volunteerBadge.className = 'volunteer-badge';
+                    volunteerBadge.textContent = 'Volunteer';
+                    officerCard.appendChild(volunteerBadge);
+                }
+                
+                // Hours per week (if available)
+                if (officer.hours_per_week && officer.hours_per_week > 0) {
+                    const hours = document.createElement('div');
+                    hours.className = 'officer-hours';
+                    hours.textContent = `${officer.hours_per_week} hrs/week`;
+                    officerCard.appendChild(hours);
+                }
+                
+                officersGrid.appendChild(officerCard);
+            });
+            
+            document.getElementById('leadership-section').style.display = 'block';
         }
 
         function formatWebsiteURL(url) {

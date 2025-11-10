@@ -235,14 +235,89 @@ def extract_foundation_info(root: ET.Element, xml_filename: str) -> Dict[str, st
     return foundation
 
 
-def extract_grants_from_xml(xml_path: Path) -> tuple[Dict[str, str], List[Dict[str, str]]]:
-    """Extract foundation info and all grant information from a single XML file."""
+def extract_officers_from_xml(root: ET.Element, xml_filename: str, foundation_ein: str) -> List[Dict[str, str]]:
+    """Extract officer, director, and trustee information from the return."""
+    officers = []
+    
+    # Try multiple possible paths for officer data
+    officer_paths = [
+        './/irs:OfficerDirTrstKeyEmplInfoGrp/irs:OfficerDirTrstKeyEmplGrp',  # 990PF
+        './/irs:IRS990PF/irs:OfficerDirTrstKeyEmplInfoGrp/irs:OfficerDirTrstKeyEmplGrp',  # 990PF nested
+        './/irs:IRS990/irs:Form990PartVIISectionAGrp',  # 990
+        './/irs:Form990PartVIISectionAGrp',  # 990 direct
+    ]
+    
+    officer_elements = []
+    for path in officer_paths:
+        found = root.findall(path, IRS_NAMESPACE)
+        if found:
+            officer_elements = found
+            break
+    
+    for officer_elem in officer_elements:
+        officer = {
+            'source_file': xml_filename,
+            'foundation_ein': foundation_ein,
+        }
+        
+        # Name
+        officer['person_name'] = get_text(officer_elem, 'irs:PersonNm', IRS_NAMESPACE)
+        if not officer['person_name']:
+            # Try business name for some cases
+            officer['person_name'] = get_text(officer_elem, 'irs:BusinessName/irs:BusinessNameLine1Txt', IRS_NAMESPACE)
+        
+        # Title
+        officer['title'] = get_text(officer_elem, 'irs:TitleTxt', IRS_NAMESPACE)
+        
+        # Compensation
+        officer['compensation'] = get_text_from_paths(officer_elem, [
+            'irs:CompensationAmt',
+            'irs:ReportableCompFromOrgAmt',
+            'irs:TotalCompensationAmt'
+        ], IRS_NAMESPACE)
+        
+        # Hours per week
+        officer['hours_per_week'] = get_text_from_paths(officer_elem, [
+            'irs:AverageHrsPerWkDevotedToPosRt',
+            'irs:AverageHoursPerWeekRt'
+        ], IRS_NAMESPACE)
+        
+        # Benefits
+        officer['benefits'] = get_text(officer_elem, 'irs:EmployeeBenefitProgramAmt', IRS_NAMESPACE)
+        
+        # Other compensation
+        officer['other_compensation'] = get_text_from_paths(officer_elem, [
+            'irs:ExpenseAccountOtherAllwncAmt',
+            'irs:OtherCompensationAmt'
+        ], IRS_NAMESPACE)
+        
+        # Position indicators (for 990 forms)
+        officer['is_officer'] = get_text(officer_elem, 'irs:OfficerInd', IRS_NAMESPACE)
+        officer['is_director'] = get_text_from_paths(officer_elem, [
+            'irs:IndividualTrusteeOrDirectorInd',
+            'irs:DirectorInd'
+        ], IRS_NAMESPACE)
+        officer['is_trustee'] = get_text(officer_elem, 'irs:TrusteeInd', IRS_NAMESPACE)
+        officer['is_key_employee'] = get_text(officer_elem, 'irs:KeyEmployeeInd', IRS_NAMESPACE)
+        
+        # Only add if we have at least a name
+        if officer['person_name']:
+            officers.append(officer)
+    
+    return officers
+
+
+def extract_grants_from_xml(xml_path: Path) -> tuple[Dict[str, str], List[Dict[str, str]], List[Dict[str, str]]]:
+    """Extract foundation info, grants, and officer information from a single XML file."""
     root = parse_xml_file(xml_path)
     if root is None:
-        return {}, []
+        return {}, [], []
     
     # Get foundation information
     foundation_info = extract_foundation_info(root, xml_path.name)
+    
+    # Get officer information
+    officers = extract_officers_from_xml(root, xml_path.name, foundation_info['filer_ein'])
     
     # Find all grant entries (try multiple possible paths)
     grants = []
@@ -358,16 +433,17 @@ def extract_grants_from_xml(xml_path: Path) -> tuple[Dict[str, str], List[Dict[s
         if grant['recipient_name'] or grant['grant_amount'] != "0":
             grants.append(grant)
     
-    return foundation_info, grants
+    return foundation_info, grants, officers
 
 
-def process_all_files(csv_file: Path, xml_dir: Path, output_grants_file: Path, output_foundations_file: Path):
-    """Process all XML files and extract grant and foundation information."""
+def process_all_files(csv_file: Path, xml_dir: Path, output_grants_file: Path, output_foundations_file: Path, output_officers_file: Path):
+    """Process all XML files and extract grant, foundation, and officer information."""
     
     logger.info(f"Reading foundation list from {csv_file}")
     
     all_grants = []
     all_foundations = {}  # Use dict to avoid duplicates by EIN
+    all_officers = []
     total_files = 0
     files_with_grants = 0
     errors = 0
@@ -385,20 +461,24 @@ def process_all_files(csv_file: Path, xml_dir: Path, output_grants_file: Path, o
                 errors += 1
                 continue
             
-            # Extract foundation info and grants from this file
-            foundation_info, grants = extract_grants_from_xml(xml_path)
+            # Extract foundation info, grants, and officers from this file
+            foundation_info, grants, officers = extract_grants_from_xml(xml_path)
             
             # Store foundation info (using EIN+file as key to handle multiple years)
             if foundation_info.get('filer_ein'):
                 key = f"{foundation_info['filer_ein']}_{foundation_info['source_file']}"
                 all_foundations[key] = foundation_info
             
+            # Store officers
+            if officers:
+                all_officers.extend(officers)
+            
             if grants:
                 files_with_grants += 1
                 all_grants.extend(grants)
-                logger.info(f"Processed {xml_filename}: Found {len(grants)} grants")
+                logger.info(f"Processed {xml_filename}: Found {len(grants)} grants, {len(officers)} officers")
             elif foundation_info.get('filer_ein'):
-                logger.info(f"Processed {xml_filename}: Foundation data only (no grants)")
+                logger.info(f"Processed {xml_filename}: Foundation data only ({len(officers)} officers)")
             
             # Log progress every 100 files
             if total_files % 100 == 0:
@@ -410,6 +490,7 @@ def process_all_files(csv_file: Path, xml_dir: Path, output_grants_file: Path, o
     logger.info(f"Files with grants: {files_with_grants}")
     logger.info(f"Total grants found: {len(all_grants)}")
     logger.info(f"Total foundations: {len(all_foundations)}")
+    logger.info(f"Total officers/directors: {len(all_officers)}")
     logger.info(f"Errors: {errors}")
     logger.info(f"{'='*60}\n")
     
@@ -457,12 +538,29 @@ def process_all_files(csv_file: Path, xml_dir: Path, output_grants_file: Path, o
         
         logger.info(f"Successfully wrote {len(all_foundations)} foundations to {output_foundations_file}")
     
+    # Write officers to CSV
+    if all_officers:
+        logger.info(f"Writing officers to {output_officers_file}")
+        
+        officer_fieldnames = [
+            'source_file', 'foundation_ein', 'person_name', 'title',
+            'compensation', 'benefits', 'other_compensation', 'hours_per_week',
+            'is_officer', 'is_director', 'is_trustee', 'is_key_employee'
+        ]
+        
+        with open(output_officers_file, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=officer_fieldnames, extrasaction='ignore')
+            writer.writeheader()
+            writer.writerows(all_officers)
+        
+        logger.info(f"Successfully wrote {len(all_officers)} officers to {output_officers_file}")
+    
     # Generate summary statistics
     if all_grants:
-        generate_summary_stats(all_grants, all_foundations)
+        generate_summary_stats(all_grants, all_foundations, all_officers)
 
 
-def generate_summary_stats(grants: List[Dict[str, str]], foundations: Dict[str, Dict[str, str]]):
+def generate_summary_stats(grants: List[Dict[str, str]], foundations: Dict[str, Dict[str, str]], officers: List[Dict[str, str]]):
     """Generate and log summary statistics."""
     
     logger.info(f"\n{'='*60}")
@@ -502,6 +600,17 @@ def generate_summary_stats(grants: List[Dict[str, str]], foundations: Dict[str, 
     non_cash_grants = sum(1 for g in grants if g.get('non_cash_grant_amount') and float(g['non_cash_grant_amount']) > 0)
     logger.info(f"Non-cash grants: {non_cash_grants}/{len(grants)}")
     
+    # Officer statistics
+    if officers:
+        unique_foundations_with_officers = len(set(o['foundation_ein'] for o in officers if o.get('foundation_ein')))
+        logger.info(f"\nFoundations with officer data: {unique_foundations_with_officers}")
+        
+        avg_officers_per_foundation = len(officers) / unique_foundations_with_officers if unique_foundations_with_officers > 0 else 0
+        logger.info(f"Average officers per foundation: {avg_officers_per_foundation:.1f}")
+        
+        officers_with_compensation = sum(1 for o in officers if o.get('compensation') and float(o.get('compensation', 0)) > 0)
+        logger.info(f"Officers with compensation: {officers_with_compensation}/{len(officers)}")
+    
     logger.info(f"{'='*60}\n")
 
 
@@ -512,6 +621,7 @@ def main():
     xml_dir = script_dir / "irs_data"
     output_grants_file = script_dir / "grants_information_summary.csv"
     output_foundations_file = script_dir / "foundations_information_summary.csv"
+    output_officers_file = script_dir / "officers_information_summary.csv"
     
     # Verify input files exist
     if not csv_file.exists():
@@ -522,19 +632,21 @@ def main():
         logger.error(f"XML directory not found: {xml_dir}")
         return
     
-    logger.info("Starting ENHANCED grant and foundation information extraction...")
+    logger.info("Starting ENHANCED grant, foundation, and officer information extraction...")
     logger.info(f"Source CSV: {csv_file}")
     logger.info(f"XML directory: {xml_dir}")
     logger.info(f"Output grants file: {output_grants_file}")
     logger.info(f"Output foundations file: {output_foundations_file}")
+    logger.info(f"Output officers file: {output_officers_file}")
     logger.info("")
     
     # Process all files
-    process_all_files(csv_file, xml_dir, output_grants_file, output_foundations_file)
+    process_all_files(csv_file, xml_dir, output_grants_file, output_foundations_file, output_officers_file)
     
     logger.info("Done!")
 
 
 if __name__ == "__main__":
     main()
+
 

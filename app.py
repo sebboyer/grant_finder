@@ -13,11 +13,20 @@ df = pd.read_csv(csv_path)
 foundations_csv_path = os.path.join(os.path.dirname(__file__), 'foundations_information_summary.csv')
 foundations_df = pd.read_csv(foundations_csv_path)
 
+# Load the officers data
+officers_csv_path = os.path.join(os.path.dirname(__file__), 'officers_information_summary.csv')
+officers_df = pd.read_csv(officers_csv_path)
+
 # Data preprocessing for grants
 df['grant_amount'] = pd.to_numeric(df['grant_amount'], errors='coerce')
 df['cash_grant_amount'] = pd.to_numeric(df['cash_grant_amount'], errors='coerce')
 df['non_cash_grant_amount'] = pd.to_numeric(df['non_cash_grant_amount'], errors='coerce')
 df = df.dropna(subset=['grant_amount'])
+
+# Data preprocessing for officers
+for col in ['compensation', 'benefits', 'other_compensation', 'hours_per_week']:
+    if col in officers_df.columns:
+        officers_df[col] = pd.to_numeric(officers_df[col], errors='coerce')
 
 # Data preprocessing for foundations
 for col in ['total_assets_eoy', 'fair_market_value_eoy', 'total_revenue', 'total_expenses', 
@@ -275,6 +284,36 @@ def get_foundations_aggregated():
     })
 
 
+def get_foundation_officers(ein):
+    """Get list of officers/directors for a foundation."""
+    foundation_officers = officers_df[officers_df['foundation_ein'] == ein]
+    
+    officers_list = []
+    for _, officer in foundation_officers.iterrows():
+        # Calculate total compensation
+        total_comp = 0
+        if pd.notna(officer.get('compensation')):
+            total_comp += float(officer.get('compensation', 0))
+        if pd.notna(officer.get('benefits')):
+            total_comp += float(officer.get('benefits', 0))
+        if pd.notna(officer.get('other_compensation')):
+            total_comp += float(officer.get('other_compensation', 0))
+        
+        officers_list.append({
+            'name': officer.get('person_name', ''),
+            'title': officer.get('title', ''),
+            'compensation': int(officer.get('compensation', 0)) if pd.notna(officer.get('compensation')) else 0,
+            'total_compensation': int(total_comp) if total_comp > 0 else 0,
+            'hours_per_week': float(officer.get('hours_per_week', 0)) if pd.notna(officer.get('hours_per_week')) else 0,
+            'is_paid': total_comp > 0
+        })
+    
+    # Sort by compensation (highest first), then by title
+    officers_list.sort(key=lambda x: (-x['total_compensation'], x['title']))
+    
+    return officers_list
+
+
 @app.route('/api/foundation/<int:ein>')
 def get_foundation_detail(ein):
     """Get detailed information for a specific foundation including all grants"""
@@ -454,7 +493,29 @@ def get_foundation_stats(ein):
         'investment_income': safe_int('investment_income'),
         'is_private_operating_foundation': safe_get('is_private_operating_foundation') in ['true', 'True', '1', 'X'],
         'is_501c3': safe_get('is_501c3') in ['true', 'True', '1', 'X'],
-        'mission': safe_get('mission_description')
+        'mission': safe_get('mission_description'),
+        # NEW: Officers/Directors
+        'officers': get_foundation_officers(ein)
+    })
+
+
+@app.route('/api/foundation/<int:ein>')
+def get_foundation_basic(ein):
+    """Get basic foundation information (used for display pages)"""
+    # This endpoint was being used before but we'll keep it for compatibility
+    # Just return simple foundation info
+    foundation = foundations_agg[foundations_agg['filer_ein'] == ein]
+    
+    if len(foundation) == 0:
+        return jsonify({'error': 'Foundation not found'}), 404
+    
+    foundation_row = foundation.iloc[0]
+    
+    return jsonify({
+        'foundation_name': foundation_row['filer_organization_name'],
+        'foundation_ein': int(foundation_row['filer_ein']),
+        'grant_count': int(foundation_row['grant_count']),
+        'total_amount': int(foundation_row['total_amount']),
     })
 
 
