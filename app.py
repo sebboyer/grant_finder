@@ -109,6 +109,13 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/favicon.ico')
+def favicon():
+    """Serve favicon from public directory"""
+    from flask import send_from_directory
+    return send_from_directory('public', 'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
+
 @app.route('/api/stats')
 def get_stats():
     """Get basic statistics about the dataset"""
