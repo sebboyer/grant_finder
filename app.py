@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import os
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='public', static_url_path='')
 
 # Global variables for lazy loading
 _data_loaded = False
@@ -107,13 +107,6 @@ def load_data():
 @app.route('/')
 def index():
     return render_template('index.html')
-
-
-@app.route('/favicon.ico')
-def favicon():
-    """Serve favicon from public directory"""
-    from flask import send_from_directory
-    return send_from_directory('public', 'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 
 @app.route('/api/stats')
