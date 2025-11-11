@@ -1,65 +1,31 @@
-# Heavy Data Files
-# IRS data directory with XML files
-irs_data/
-
-# CSV files (data files)
-*.csv
-
-# Python virtual environments
-venv/
-env/
-ENV/
-
-# Python cache files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-
-# Distribution / packaging
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+venv/
+env/
+ENV/
 *.egg-info/
-.installed.cfg
-*.egg
+dist/
+build/
 
-# Log files
-*.log
-logs/
-
-# IDE specific files
+# IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+
+# OS
 .DS_Store
+Thumbs.db
 
-# Environment variables
-.env
-.env.local
+# Archives & Data Processing
+data_archive/
+scripts/
+irs_data/
 
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
+# Vercel
+.vercel

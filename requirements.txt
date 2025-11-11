@@ -1,3 +1,5 @@
-beautifulsoup4==4.12.3
-lxml==5.3.0
-
+# Flask Web Application Dependencies
+Flask==3.0.0
+pandas==2.1.4
+numpy==1.26.3
+Werkzeug==3.0.1
