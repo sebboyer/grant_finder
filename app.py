@@ -5,89 +5,103 @@ import os
 
 app = Flask(__name__)
 
-# Load the grants data
-csv_path = os.path.join(os.path.dirname(__file__), 'grants_information_summary.csv')
-df = pd.read_csv(csv_path)
+# Global variables for lazy loading
+_data_loaded = False
+df = None
+foundations_df = None
+officers_df = None
+foundations_agg = None
 
-# Load the foundations data
-foundations_csv_path = os.path.join(os.path.dirname(__file__), 'foundations_information_summary.csv')
-foundations_df = pd.read_csv(foundations_csv_path)
 
-# Load the officers data
-officers_csv_path = os.path.join(os.path.dirname(__file__), 'officers_information_summary.csv')
-officers_df = pd.read_csv(officers_csv_path)
-
-# Data preprocessing for grants
-df['grant_amount'] = pd.to_numeric(df['grant_amount'], errors='coerce')
-df['cash_grant_amount'] = pd.to_numeric(df['cash_grant_amount'], errors='coerce')
-df['non_cash_grant_amount'] = pd.to_numeric(df['non_cash_grant_amount'], errors='coerce')
-df = df.dropna(subset=['grant_amount'])
-
-# Data preprocessing for officers
-for col in ['compensation', 'benefits', 'other_compensation', 'hours_per_week']:
-    if col in officers_df.columns:
-        officers_df[col] = pd.to_numeric(officers_df[col], errors='coerce')
-
-# Data preprocessing for foundations
-for col in ['total_assets_eoy', 'fair_market_value_eoy', 'total_revenue', 'total_expenses', 
-            'total_distributions', 'investment_income']:
-    if col in foundations_df.columns:
-        foundations_df[col] = pd.to_numeric(foundations_df[col], errors='coerce')
-
-# Create foundation-level aggregation
-print("Aggregating foundation data...")
-foundations_agg = df.groupby(['filer_ein', 'filer_organization_name']).agg({
-    'grant_amount': ['count', 'sum', 'median', 'mean', 'min', 'max'],
-    'recipient_state': lambda x: list(x.dropna().unique()),
-    'recipient_city': lambda x: list(x.dropna().unique())[:10],
-    'grant_purpose': lambda x: x.value_counts().head(3).index.tolist() if len(x) > 0 else [],
-    'tax_period_end': 'max'
-}).reset_index()
-
-# Flatten column names
-foundations_agg.columns = ['filer_ein', 'filer_organization_name', 'grant_count', 'total_amount', 
-                           'median_grant', 'avg_grant', 'min_grant', 'max_grant',
-                           'states_served', 'cities_served', 'top_purposes', 'latest_period']
-
-# Calculate primary state of activity (state with highest total grant amount)
-print("Calculating primary state of activity for each foundation...")
-def get_primary_state(ein):
-    """Get the state where the foundation gave the most money"""
-    foundation_grants = df[df['filer_ein'] == ein]
-    state_totals = foundation_grants.groupby('recipient_state')['grant_amount'].sum()
-    if len(state_totals) > 0:
-        primary_state = state_totals.idxmax()
-        return primary_state if pd.notna(primary_state) else ''
-    return ''
-
-foundations_agg['primary_state'] = foundations_agg['filer_ein'].apply(get_primary_state)
-
-# Merge foundation-level data from the foundations CSV
-print("Merging foundation-level metadata...")
-# Get the most recent record for each foundation (by tax_period_end)
-foundations_df['tax_period_end'] = pd.to_datetime(foundations_df['tax_period_end'], errors='coerce')
-foundations_latest = foundations_df.sort_values('tax_period_end').groupby('filer_ein').last().reset_index()
-
-# Merge foundation data into aggregation
-foundations_agg = foundations_agg.merge(
-    foundations_latest[[
-        'filer_ein', 'formation_year', 'foundation_address_line1', 'foundation_address_line2',
-        'foundation_city', 'foundation_state', 'foundation_zip', 'foundation_phone',
-        'foundation_website', 'legal_domicile_state', 'total_assets_eoy', 
-        'fair_market_value_eoy', 'total_revenue', 'total_expenses', 'total_distributions',
-        'investment_income', 'is_private_operating_foundation', 'is_501c3', 'mission_description'
-    ]],
-    on='filer_ein',
-    how='left'
-)
-
-# Convert to int where appropriate
-foundations_agg['grant_count'] = foundations_agg['grant_count'].astype(int)
-foundations_agg['total_amount'] = foundations_agg['total_amount'].astype(int)
-foundations_agg['median_grant'] = foundations_agg['median_grant'].astype(int)
-foundations_agg['avg_grant'] = foundations_agg['avg_grant'].astype(int)
-foundations_agg['min_grant'] = foundations_agg['min_grant'].astype(int)
-foundations_agg['max_grant'] = foundations_agg['max_grant'].astype(int)
+def load_data():
+    """Lazy load and process data on first request"""
+    global _data_loaded, df, foundations_df, officers_df, foundations_agg
+    
+    if _data_loaded:
+        return
+    
+    # Load the grants data
+    csv_path = os.path.join(os.path.dirname(__file__), 'grants_information_summary.csv')
+    df = pd.read_csv(csv_path)
+    
+    # Load the foundations data
+    foundations_csv_path = os.path.join(os.path.dirname(__file__), 'foundations_information_summary.csv')
+    foundations_df = pd.read_csv(foundations_csv_path)
+    
+    # Load the officers data
+    officers_csv_path = os.path.join(os.path.dirname(__file__), 'officers_information_summary.csv')
+    officers_df = pd.read_csv(officers_csv_path)
+    
+    # Data preprocessing for grants
+    df['grant_amount'] = pd.to_numeric(df['grant_amount'], errors='coerce')
+    df['cash_grant_amount'] = pd.to_numeric(df['cash_grant_amount'], errors='coerce')
+    df['non_cash_grant_amount'] = pd.to_numeric(df['non_cash_grant_amount'], errors='coerce')
+    df = df.dropna(subset=['grant_amount'])
+    
+    # Data preprocessing for officers
+    for col in ['compensation', 'benefits', 'other_compensation', 'hours_per_week']:
+        if col in officers_df.columns:
+            officers_df[col] = pd.to_numeric(officers_df[col], errors='coerce')
+    
+    # Data preprocessing for foundations
+    for col in ['total_assets_eoy', 'fair_market_value_eoy', 'total_revenue', 'total_expenses', 
+                'total_distributions', 'investment_income']:
+        if col in foundations_df.columns:
+            foundations_df[col] = pd.to_numeric(foundations_df[col], errors='coerce')
+    
+    # Create foundation-level aggregation
+    foundations_agg = df.groupby(['filer_ein', 'filer_organization_name']).agg({
+        'grant_amount': ['count', 'sum', 'median', 'mean', 'min', 'max'],
+        'recipient_state': lambda x: list(x.dropna().unique()),
+        'recipient_city': lambda x: list(x.dropna().unique())[:10],
+        'grant_purpose': lambda x: x.value_counts().head(3).index.tolist() if len(x) > 0 else [],
+        'tax_period_end': 'max'
+    }).reset_index()
+    
+    # Flatten column names
+    foundations_agg.columns = ['filer_ein', 'filer_organization_name', 'grant_count', 'total_amount', 
+                               'median_grant', 'avg_grant', 'min_grant', 'max_grant',
+                               'states_served', 'cities_served', 'top_purposes', 'latest_period']
+    
+    # Calculate primary state of activity (state with highest total grant amount)
+    def get_primary_state(ein):
+        """Get the state where the foundation gave the most money"""
+        foundation_grants = df[df['filer_ein'] == ein]
+        state_totals = foundation_grants.groupby('recipient_state')['grant_amount'].sum()
+        if len(state_totals) > 0:
+            primary_state = state_totals.idxmax()
+            return primary_state if pd.notna(primary_state) else ''
+        return ''
+    
+    foundations_agg['primary_state'] = foundations_agg['filer_ein'].apply(get_primary_state)
+    
+    # Merge foundation-level data from the foundations CSV
+    # Get the most recent record for each foundation (by tax_period_end)
+    foundations_df['tax_period_end'] = pd.to_datetime(foundations_df['tax_period_end'], errors='coerce')
+    foundations_latest = foundations_df.sort_values('tax_period_end').groupby('filer_ein').last().reset_index()
+    
+    # Merge foundation data into aggregation
+    foundations_agg = foundations_agg.merge(
+        foundations_latest[[
+            'filer_ein', 'formation_year', 'foundation_address_line1', 'foundation_address_line2',
+            'foundation_city', 'foundation_state', 'foundation_zip', 'foundation_phone',
+            'foundation_website', 'legal_domicile_state', 'total_assets_eoy', 
+            'fair_market_value_eoy', 'total_revenue', 'total_expenses', 'total_distributions',
+            'investment_income', 'is_private_operating_foundation', 'is_501c3', 'mission_description'
+        ]],
+        on='filer_ein',
+        how='left'
+    )
+    
+    # Convert to int where appropriate
+    foundations_agg['grant_count'] = foundations_agg['grant_count'].astype(int)
+    foundations_agg['total_amount'] = foundations_agg['total_amount'].astype(int)
+    foundations_agg['median_grant'] = foundations_agg['median_grant'].astype(int)
+    foundations_agg['avg_grant'] = foundations_agg['avg_grant'].astype(int)
+    foundations_agg['min_grant'] = foundations_agg['min_grant'].astype(int)
+    foundations_agg['max_grant'] = foundations_agg['max_grant'].astype(int)
+    
+    _data_loaded = True
 
 
 @app.route('/')
@@ -98,6 +112,7 @@ def index():
 @app.route('/api/stats')
 def get_stats():
     """Get basic statistics about the dataset"""
+    load_data()
     stats = {
         'total_grants': len(df),
         'total_foundations': df['filer_organization_name'].nunique(),
@@ -118,6 +133,7 @@ def get_stats():
 @app.route('/api/search')
 def search_grants():
     """Search and filter grants"""
+    load_data()
     # Get query parameters
     foundation_name = request.args.get('foundation', '').strip().upper()
     min_amount = request.args.get('min_amount', type=int)
@@ -191,6 +207,7 @@ def search_grants():
 @app.route('/api/foundations')
 def get_foundations():
     """Get list of all foundation names for autocomplete"""
+    load_data()
     query = request.args.get('q', '').strip().upper()
     
     foundations = df['filer_organization_name'].dropna().unique()
@@ -207,6 +224,7 @@ def get_foundations():
 @app.route('/api/foundations_aggregated')
 def get_foundations_aggregated():
     """Get aggregated foundation data with filters"""
+    load_data()
     # Get query parameters
     foundation_name = request.args.get('foundation', '').strip()
     state = request.args.get('state', '').strip().upper()
@@ -286,6 +304,7 @@ def get_foundations_aggregated():
 
 def get_foundation_officers(ein):
     """Get list of officers/directors for a foundation."""
+    load_data()
     foundation_officers = officers_df[officers_df['foundation_ein'] == ein]
     
     officers_list = []
@@ -317,6 +336,7 @@ def get_foundation_officers(ein):
 @app.route('/api/foundation/<int:ein>')
 def get_foundation_detail(ein):
     """Get detailed information for a specific foundation including all grants"""
+    load_data()
     # Get foundation aggregate data
     foundation = foundations_agg[foundations_agg['filer_ein'] == ein]
     
@@ -383,6 +403,7 @@ def foundation_profile(ein):
 @app.route('/api/foundation/<int:ein>/stats')
 def get_foundation_stats(ein):
     """Get detailed statistics for a foundation including state-by-state breakdown"""
+    load_data()
     # Get foundation aggregate data
     foundation = foundations_agg[foundations_agg['filer_ein'] == ein]
     
@@ -502,6 +523,7 @@ def get_foundation_stats(ein):
 @app.route('/api/foundation/<int:ein>')
 def get_foundation_basic(ein):
     """Get basic foundation information (used for display pages)"""
+    load_data()
     # This endpoint was being used before but we'll keep it for compatibility
     # Just return simple foundation info
     foundation = foundations_agg[foundations_agg['filer_ein'] == ein]
@@ -520,6 +542,7 @@ def get_foundation_basic(ein):
 
 
 if __name__ == '__main__':
+    load_data()  # Load data in development mode
     print("Starting Zeffy Grant Finder webapp...")
     print(f"Loaded {len(df)} grants from {len(foundations_agg)} foundations")
     print(f"Foundation aggregation complete!")
@@ -530,4 +553,3 @@ if __name__ == '__main__':
     print("   • Foundation-level view: Browse foundations with stats")
     print("="*60 + "\n")
     app.run(debug=True, port=5001, host='127.0.0.1')
-
