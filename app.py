@@ -1,107 +1,7 @@
 from flask import Flask, render_template, request, jsonify
-import pandas as pd
-import numpy as np
-import os
+from api import supabase_api
 
 app = Flask(__name__, static_folder='public', static_url_path='')
-
-# Global variables for lazy loading
-_data_loaded = False
-df = None
-foundations_df = None
-officers_df = None
-foundations_agg = None
-
-
-def load_data():
-    """Lazy load and process data on first request"""
-    global _data_loaded, df, foundations_df, officers_df, foundations_agg
-    
-    if _data_loaded:
-        return
-    
-    # Load the grants data
-    csv_path = os.path.join(os.path.dirname(__file__), 'grants_information_summary.csv')
-    df = pd.read_csv(csv_path)
-    
-    # Load the foundations data
-    foundations_csv_path = os.path.join(os.path.dirname(__file__), 'foundations_information_summary.csv')
-    foundations_df = pd.read_csv(foundations_csv_path)
-    
-    # Load the officers data
-    officers_csv_path = os.path.join(os.path.dirname(__file__), 'officers_information_summary.csv')
-    officers_df = pd.read_csv(officers_csv_path)
-    
-    # Data preprocessing for grants
-    df['grant_amount'] = pd.to_numeric(df['grant_amount'], errors='coerce')
-    df['cash_grant_amount'] = pd.to_numeric(df['cash_grant_amount'], errors='coerce')
-    df['non_cash_grant_amount'] = pd.to_numeric(df['non_cash_grant_amount'], errors='coerce')
-    df = df.dropna(subset=['grant_amount'])
-    
-    # Data preprocessing for officers
-    for col in ['compensation', 'benefits', 'other_compensation', 'hours_per_week']:
-        if col in officers_df.columns:
-            officers_df[col] = pd.to_numeric(officers_df[col], errors='coerce')
-    
-    # Data preprocessing for foundations
-    for col in ['total_assets_eoy', 'fair_market_value_eoy', 'total_revenue', 'total_expenses', 
-                'total_distributions', 'investment_income']:
-        if col in foundations_df.columns:
-            foundations_df[col] = pd.to_numeric(foundations_df[col], errors='coerce')
-    
-    # Create foundation-level aggregation
-    foundations_agg = df.groupby(['filer_ein', 'filer_organization_name']).agg({
-        'grant_amount': ['count', 'sum', 'median', 'mean', 'min', 'max'],
-        'recipient_state': lambda x: list(x.dropna().unique()),
-        'recipient_city': lambda x: list(x.dropna().unique())[:10],
-        'grant_purpose': lambda x: x.value_counts().head(3).index.tolist() if len(x) > 0 else [],
-        'tax_period_end': 'max'
-    }).reset_index()
-    
-    # Flatten column names
-    foundations_agg.columns = ['filer_ein', 'filer_organization_name', 'grant_count', 'total_amount', 
-                               'median_grant', 'avg_grant', 'min_grant', 'max_grant',
-                               'states_served', 'cities_served', 'top_purposes', 'latest_period']
-    
-    # Calculate primary state of activity (state with highest total grant amount)
-    def get_primary_state(ein):
-        """Get the state where the foundation gave the most money"""
-        foundation_grants = df[df['filer_ein'] == ein]
-        state_totals = foundation_grants.groupby('recipient_state')['grant_amount'].sum()
-        if len(state_totals) > 0:
-            primary_state = state_totals.idxmax()
-            return primary_state if pd.notna(primary_state) else ''
-        return ''
-    
-    foundations_agg['primary_state'] = foundations_agg['filer_ein'].apply(get_primary_state)
-    
-    # Merge foundation-level data from the foundations CSV
-    # Get the most recent record for each foundation (by tax_period_end)
-    foundations_df['tax_period_end'] = pd.to_datetime(foundations_df['tax_period_end'], errors='coerce')
-    foundations_latest = foundations_df.sort_values('tax_period_end').groupby('filer_ein').last().reset_index()
-    
-    # Merge foundation data into aggregation
-    foundations_agg = foundations_agg.merge(
-        foundations_latest[[
-            'filer_ein', 'formation_year', 'foundation_address_line1', 'foundation_address_line2',
-            'foundation_city', 'foundation_state', 'foundation_zip', 'foundation_phone',
-            'foundation_website', 'legal_domicile_state', 'total_assets_eoy', 
-            'fair_market_value_eoy', 'total_revenue', 'total_expenses', 'total_distributions',
-            'investment_income', 'is_private_operating_foundation', 'is_501c3', 'mission_description'
-        ]],
-        on='filer_ein',
-        how='left'
-    )
-    
-    # Convert to int where appropriate
-    foundations_agg['grant_count'] = foundations_agg['grant_count'].astype(int)
-    foundations_agg['total_amount'] = foundations_agg['total_amount'].astype(int)
-    foundations_agg['median_grant'] = foundations_agg['median_grant'].astype(int)
-    foundations_agg['avg_grant'] = foundations_agg['avg_grant'].astype(int)
-    foundations_agg['min_grant'] = foundations_agg['min_grant'].astype(int)
-    foundations_agg['max_grant'] = foundations_agg['max_grant'].astype(int)
-    
-    _data_loaded = True
 
 
 @app.route('/')
@@ -112,111 +12,54 @@ def index():
 @app.route('/api/stats')
 def get_stats():
     """Get basic statistics about the dataset"""
-    load_data()
-    stats = {
-        'total_grants': len(df),
-        'total_foundations': df['filer_organization_name'].nunique(),
-        'total_amount': int(df['grant_amount'].sum()),
-        'avg_grant': int(df['grant_amount'].mean()),
-        'min_grant': int(df['grant_amount'].min()),
-        'max_grant': int(df['grant_amount'].max()),
-        'states': sorted(df['recipient_state'].dropna().unique().tolist()),
-        # Foundation-level stats
-        'avg_grants_per_foundation': int(foundations_agg['grant_count'].mean()),
-        'median_grants_per_foundation': int(foundations_agg['grant_count'].median()),
-        'avg_total_per_foundation': int(foundations_agg['total_amount'].mean()),
-        'median_total_per_foundation': int(foundations_agg['total_amount'].median())
-    }
+    stats = supabase_api.get_stats()
     return jsonify(stats)
 
 
 @app.route('/api/search')
 def search_grants():
     """Search and filter grants"""
-    load_data()
     # Get query parameters
-    foundation_name = request.args.get('foundation', '').strip().upper()
+    foundation_name = request.args.get('foundation', '').strip()
     min_amount = request.args.get('min_amount', type=int)
     max_amount = request.args.get('max_amount', type=int)
     state = request.args.get('state', '').strip().upper()
-    city = request.args.get('city', '').strip().upper()
+    city = request.args.get('city', '').strip()
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     
-    # Start with full dataset
-    filtered_df = df.copy()
-    
-    # Apply filters
-    if foundation_name:
-        filtered_df = filtered_df[
-            filtered_df['filer_organization_name'].str.contains(foundation_name, case=False, na=False)
-        ]
-    
-    if min_amount is not None:
-        filtered_df = filtered_df[filtered_df['grant_amount'] >= min_amount]
-    
-    if max_amount is not None:
-        filtered_df = filtered_df[filtered_df['grant_amount'] <= max_amount]
-    
-    if state:
-        filtered_df = filtered_df[
-            filtered_df['recipient_state'].str.upper() == state
-        ]
-    
-    if city:
-        filtered_df = filtered_df[
-            filtered_df['recipient_city'].str.contains(city, case=False, na=False)
-        ]
-    
-    # Sort by grant amount descending
-    filtered_df = filtered_df.sort_values('grant_amount', ascending=False)
-    
-    # Pagination
-    total_results = len(filtered_df)
-    start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
-    page_df = filtered_df.iloc[start_idx:end_idx]
-    
-    # Convert to JSON-friendly format
-    results = []
-    for _, row in page_df.iterrows():
-        results.append({
-            'foundation_name': row['filer_organization_name'],
-            'foundation_ein': row['filer_ein'],
-            'recipient_name': row['recipient_name'],
-            'recipient_city': row['recipient_city'] if pd.notna(row['recipient_city']) else '',
-            'recipient_state': row['recipient_state'] if pd.notna(row['recipient_state']) else '',
-            'recipient_relationship': row.get('recipient_relationship', '') if pd.notna(row.get('recipient_relationship')) else '',
-            'recipient_foundation_status': row.get('recipient_foundation_status', '') if pd.notna(row.get('recipient_foundation_status')) else '',
-            'grant_amount': int(row['grant_amount']),
-            'cash_amount': int(row.get('cash_grant_amount', 0)) if pd.notna(row.get('cash_grant_amount')) else 0,
-            'non_cash_amount': int(row.get('non_cash_grant_amount', 0)) if pd.notna(row.get('non_cash_grant_amount')) else 0,
-            'grant_purpose': row['grant_purpose'] if pd.notna(row['grant_purpose']) else 'No purpose specified',
-            'tax_period': row['tax_period_end'] if pd.notna(row['tax_period_end']) else ''
-        })
+    # Search grants using Supabase API
+    results, total_results = supabase_api.search_grants(
+        foundation_name=foundation_name if foundation_name else None,
+        min_amount=min_amount,
+        max_amount=max_amount,
+        state=state if state else None,
+        city=city if city else None,
+        page=page,
+        per_page=per_page
+    )
     
     return jsonify({
         'results': results,
         'total': total_results,
         'page': page,
         'per_page': per_page,
-        'total_pages': (total_results + per_page - 1) // per_page
+        'total_pages': (total_results + per_page - 1) // per_page if total_results > 0 else 0
     })
 
 
 @app.route('/api/foundations')
 def get_foundations():
     """Get list of all foundation names for autocomplete"""
-    load_data()
     query = request.args.get('q', '').strip().upper()
     
-    foundations = df['filer_organization_name'].dropna().unique()
+    foundations = supabase_api.get_all_foundation_eins()
     
     if query:
         foundations = [f for f in foundations if query in f.upper()]
     
     # Limit to 50 results for autocomplete
-    foundations = sorted(foundations)[:50]
+    foundations = foundations[:50]
     
     return jsonify(foundations)
 
@@ -224,7 +67,6 @@ def get_foundations():
 @app.route('/api/foundations_aggregated')
 def get_foundations_aggregated():
     """Get aggregated foundation data with filters"""
-    load_data()
     # Get query parameters
     foundation_name = request.args.get('foundation', '').strip()
     state = request.args.get('state', '').strip().upper()
@@ -236,160 +78,85 @@ def get_foundations_aggregated():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     
-    # Start with full foundation dataset
-    filtered_df = foundations_agg.copy()
+    # Get aggregated foundations
+    results, total_results = supabase_api.get_all_foundations_aggregated(
+        foundation_name=foundation_name if foundation_name else None,
+        state=state if state else None,
+        min_total=min_total,
+        max_total=max_total,
+        min_grants=min_grants,
+        min_median=min_median,
+        max_median=max_median,
+        page=page,
+        per_page=per_page
+    )
     
-    # Apply filters
-    if foundation_name:
-        filtered_df = filtered_df[
-            filtered_df['filer_organization_name'].str.contains(foundation_name, case=False, na=False)
-        ]
-    
-    if state:
-        filtered_df = filtered_df[
-            filtered_df['states_served'].apply(lambda x: state in x if isinstance(x, list) else False)
-        ]
-    
-    if min_total is not None:
-        filtered_df = filtered_df[filtered_df['total_amount'] >= min_total]
-    
-    if max_total is not None:
-        filtered_df = filtered_df[filtered_df['total_amount'] <= max_total]
-    
-    if min_grants is not None:
-        filtered_df = filtered_df[filtered_df['grant_count'] >= min_grants]
-    
-    if min_median is not None:
-        filtered_df = filtered_df[filtered_df['median_grant'] >= min_median]
-    
-    if max_median is not None:
-        filtered_df = filtered_df[filtered_df['median_grant'] <= max_median]
-    
-    # Sort by total amount descending
-    filtered_df = filtered_df.sort_values('total_amount', ascending=False)
-    
-    # Pagination
-    total_results = len(filtered_df)
-    start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
-    page_df = filtered_df.iloc[start_idx:end_idx]
-    
-    # Convert to JSON-friendly format
-    results = []
-    for _, row in page_df.iterrows():
-        results.append({
+    # Format results to match original response
+    formatted_results = []
+    for row in results:
+        formatted_results.append({
             'foundation_name': row['filer_organization_name'],
-            'foundation_ein': int(row['filer_ein']),
-            'grant_count': int(row['grant_count']),
-            'total_amount': int(row['total_amount']),
-            'median_grant': int(row['median_grant']),
-            'avg_grant': int(row['avg_grant']),
-            'min_grant': int(row['min_grant']),
-            'max_grant': int(row['max_grant']),
-            'states_served': row['states_served'] if isinstance(row['states_served'], list) else [],
-            'cities_served': row['cities_served'] if isinstance(row['cities_served'], list) else [],
-            'top_purposes': row['top_purposes'] if isinstance(row['top_purposes'], list) else [],
-            'latest_period': row['latest_period'] if pd.notna(row['latest_period']) else '',
-            'primary_state': row['primary_state'] if pd.notna(row['primary_state']) else ''
+            'foundation_ein': row['filer_ein'],
+            'grant_count': row['grant_count'],
+            'total_amount': row['total_amount'],
+            'median_grant': row['median_grant'],
+            'avg_grant': row['avg_grant'],
+            'min_grant': row['min_grant'],
+            'max_grant': row['max_grant'],
+            'states_served': row['states_served'],
+            'cities_served': row['cities_served'],
+            'top_purposes': row['top_purposes'],
+            'latest_period': row['latest_period'],
+            'primary_state': row['primary_state']
         })
     
     return jsonify({
-        'results': results,
+        'results': formatted_results,
         'total': total_results,
         'page': page,
         'per_page': per_page,
-        'total_pages': (total_results + per_page - 1) // per_page
+        'total_pages': (total_results + per_page - 1) // per_page if total_results > 0 else 0
     })
-
-
-def get_foundation_officers(ein):
-    """Get list of officers/directors for a foundation."""
-    load_data()
-    foundation_officers = officers_df[officers_df['foundation_ein'] == ein]
-    
-    officers_list = []
-    for _, officer in foundation_officers.iterrows():
-        # Calculate total compensation
-        total_comp = 0
-        if pd.notna(officer.get('compensation')):
-            total_comp += float(officer.get('compensation', 0))
-        if pd.notna(officer.get('benefits')):
-            total_comp += float(officer.get('benefits', 0))
-        if pd.notna(officer.get('other_compensation')):
-            total_comp += float(officer.get('other_compensation', 0))
-        
-        officers_list.append({
-            'name': officer.get('person_name', ''),
-            'title': officer.get('title', ''),
-            'compensation': int(officer.get('compensation', 0)) if pd.notna(officer.get('compensation')) else 0,
-            'total_compensation': int(total_comp) if total_comp > 0 else 0,
-            'hours_per_week': float(officer.get('hours_per_week', 0)) if pd.notna(officer.get('hours_per_week')) else 0,
-            'is_paid': total_comp > 0
-        })
-    
-    # Sort by compensation (highest first), then by title
-    officers_list.sort(key=lambda x: (-x['total_compensation'], x['title']))
-    
-    return officers_list
 
 
 @app.route('/api/foundation/<int:ein>')
 def get_foundation_detail(ein):
     """Get detailed information for a specific foundation including all grants"""
-    load_data()
-    # Get foundation aggregate data
-    foundation = foundations_agg[foundations_agg['filer_ein'] == ein]
+    # Get foundation aggregated stats
+    foundation_data = supabase_api.get_foundation_aggregated_stats(ein)
     
-    if len(foundation) == 0:
+    if not foundation_data:
         return jsonify({'error': 'Foundation not found'}), 404
     
-    foundation_row = foundation.iloc[0]
-    
     # Get all grants for this foundation
-    foundation_grants = df[df['filer_ein'] == ein].sort_values('grant_amount', ascending=False)
-    
-    grants = []
-    for _, grant in foundation_grants.iterrows():
-        grants.append({
-            'recipient_name': grant['recipient_name'],
-            'recipient_ein': grant.get('recipient_ein', '') if pd.notna(grant.get('recipient_ein')) else '',
-            'recipient_city': grant['recipient_city'] if pd.notna(grant['recipient_city']) else '',
-            'recipient_state': grant['recipient_state'] if pd.notna(grant['recipient_state']) else '',
-            'recipient_relationship': grant.get('recipient_relationship', '') if pd.notna(grant.get('recipient_relationship')) else '',
-            'recipient_foundation_status': grant.get('recipient_foundation_status', '') if pd.notna(grant.get('recipient_foundation_status')) else '',
-            'grant_amount': int(grant['grant_amount']),
-            'cash_amount': int(grant.get('cash_grant_amount', 0)) if pd.notna(grant.get('cash_grant_amount')) else 0,
-            'non_cash_amount': int(grant.get('non_cash_grant_amount', 0)) if pd.notna(grant.get('non_cash_grant_amount')) else 0,
-            'grant_purpose': grant['grant_purpose'] if pd.notna(grant['grant_purpose']) else 'No purpose specified',
-            'tax_period': grant['tax_period_end'] if pd.notna(grant['tax_period_end']) else ''
-        })
+    grants = supabase_api.get_foundation_grants(ein)
     
     # Helper for safe value extraction
-    def safe_get(key, default=''):
-        val = foundation_row.get(key, default)
-        if pd.isna(val):
+    def safe_get(data, key, default=''):
+        val = data.get(key, default)
+        if val is None:
             return default
         return val
     
     return jsonify({
-        'foundation_name': foundation_row['filer_organization_name'],
-        'foundation_ein': int(foundation_row['filer_ein']),
-        'grant_count': int(foundation_row['grant_count']),
-        'total_amount': int(foundation_row['total_amount']),
-        'median_grant': int(foundation_row['median_grant']),
-        'avg_grant': int(foundation_row['avg_grant']),
-        'min_grant': int(foundation_row['min_grant']),
-        'max_grant': int(foundation_row['max_grant']),
-        'states_served': foundation_row['states_served'] if isinstance(foundation_row['states_served'], list) else [],
-        'cities_served': foundation_row['cities_served'] if isinstance(foundation_row['cities_served'], list) else [],
-        'top_purposes': foundation_row['top_purposes'] if isinstance(foundation_row['top_purposes'], list) else [],
-        'latest_period': safe_get('latest_period'),
-        'primary_state': safe_get('primary_state'),
-        # NEW: Foundation contact info
-        'foundation_website': safe_get('foundation_website'),
-        'foundation_phone': safe_get('foundation_phone'),
-        'foundation_city': safe_get('foundation_city'),
-        'foundation_state': safe_get('foundation_state'),
+        'foundation_name': foundation_data['foundation_name'],
+        'foundation_ein': foundation_data['foundation_ein'],
+        'grant_count': foundation_data['grant_count'],
+        'total_amount': foundation_data['total_amount'],
+        'median_grant': foundation_data['median_grant'],
+        'avg_grant': foundation_data['avg_grant'],
+        'min_grant': foundation_data['min_grant'],
+        'max_grant': foundation_data['max_grant'],
+        'states_served': foundation_data['states_served'],
+        'cities_served': foundation_data['cities_served'],
+        'top_purposes': foundation_data['top_purposes'],
+        'latest_period': safe_get(foundation_data, 'latest_period'),
+        'primary_state': safe_get(foundation_data, 'primary_state'),
+        # Foundation contact info
+        'foundation_website': safe_get(foundation_data, 'foundation_website'),
+        'foundation_phone': safe_get(foundation_data, 'foundation_phone'),
+        'foundation_city': safe_get(foundation_data, 'foundation_city'),
+        'foundation_state': safe_get(foundation_data, 'foundation_state'),
         'grants': grants
     })
 
@@ -403,100 +170,88 @@ def foundation_profile(ein):
 @app.route('/api/foundation/<int:ein>/stats')
 def get_foundation_stats(ein):
     """Get detailed statistics for a foundation including state-by-state breakdown"""
-    load_data()
-    # Get foundation aggregate data
-    foundation = foundations_agg[foundations_agg['filer_ein'] == ein]
+    # Get foundation aggregated data
+    foundation_data = supabase_api.get_foundation_aggregated_stats(ein)
     
-    if len(foundation) == 0:
+    if not foundation_data:
         return jsonify({'error': 'Foundation not found'}), 404
     
-    foundation_row = foundation.iloc[0]
-    
-    # Get all grants for this foundation
-    foundation_grants = df[df['filer_ein'] == ein]
+    # Get all grants for state breakdown and top/recent grants
+    all_grants = supabase_api.get_foundation_grants(ein)
     
     # Calculate state-by-state statistics
-    state_stats = foundation_grants.groupby('recipient_state').agg({
-        'grant_amount': ['count', 'sum', 'mean', 'median']
-    }).reset_index()
+    states_data = supabase_api.get_foundation_state_breakdown(ein)
     
-    state_stats.columns = ['state', 'grant_count', 'total_amount', 'avg_grant', 'median_grant']
-    
-    # Convert to dictionary for JSON
-    states_data = []
-    for _, row in state_stats.iterrows():
-        if pd.notna(row['state']) and row['state']:
-            states_data.append({
-                'state': row['state'],
-                'grant_count': int(row['grant_count']),
-                'total_amount': int(row['total_amount']),
-                'avg_grant': int(row['avg_grant']),
-                'median_grant': int(row['median_grant'])
-            })
-    
-    # Sort by grant count descending
-    states_data.sort(key=lambda x: x['grant_count'], reverse=True)
-    
-    # Get top 10 grants
-    top_grants = foundation_grants.nlargest(10, 'grant_amount')
+    # Get top 10 grants (already sorted by amount descending)
     top_grants_list = []
-    for _, grant in top_grants.iterrows():
+    for grant in all_grants[:10]:
         top_grants_list.append({
             'recipient_name': grant['recipient_name'],
-            'recipient_city': grant['recipient_city'] if pd.notna(grant['recipient_city']) else '',
-            'recipient_state': grant['recipient_state'] if pd.notna(grant['recipient_state']) else '',
-            'grant_amount': int(grant['grant_amount']),
-            'grant_purpose': grant['grant_purpose'] if pd.notna(grant['grant_purpose']) else 'No purpose specified',
-            'tax_period': grant['tax_period_end'] if pd.notna(grant['tax_period_end']) else ''
+            'recipient_city': grant['recipient_city'],
+            'recipient_state': grant['recipient_state'],
+            'grant_amount': grant['grant_amount'],
+            'grant_purpose': grant['grant_purpose'],
+            'tax_period': grant['tax_period']
         })
     
-    # Get sample of recent grants (10 most recent by tax period)
-    recent_grants = foundation_grants.sort_values('tax_period_end', ascending=False).head(10)
+    # Get most recent 10 grants (sort by tax period)
+    recent_grants_sorted = sorted(all_grants, key=lambda x: x['tax_period'], reverse=True)
     recent_grants_list = []
-    for _, grant in recent_grants.iterrows():
+    for grant in recent_grants_sorted[:10]:
         recent_grants_list.append({
             'recipient_name': grant['recipient_name'],
-            'recipient_city': grant['recipient_city'] if pd.notna(grant['recipient_city']) else '',
-            'recipient_state': grant['recipient_state'] if pd.notna(grant['recipient_state']) else '',
-            'grant_amount': int(grant['grant_amount']),
-            'grant_purpose': grant['grant_purpose'] if pd.notna(grant['grant_purpose']) else 'No purpose specified',
-            'tax_period': grant['tax_period_end'] if pd.notna(grant['tax_period_end']) else ''
+            'recipient_city': grant['recipient_city'],
+            'recipient_state': grant['recipient_state'],
+            'grant_amount': grant['grant_amount'],
+            'grant_purpose': grant['grant_purpose'],
+            'tax_period': grant['tax_period']
         })
     
-    # Helper function to safely get values
+    # Get officers
+    officers = supabase_api.get_foundation_officers(ein)
+    
+    # Helper functions to safely get values
     def safe_get(key, default=''):
-        val = foundation_row.get(key, default)
-        if pd.isna(val):
+        val = foundation_data.get(key, default)
+        if val is None:
             return default
         return val
     
     def safe_int(key, default=0):
-        val = foundation_row.get(key, default)
-        if pd.isna(val):
+        val = foundation_data.get(key, default)
+        if val is None or val == '':
             return default
         try:
             return int(val)
         except (ValueError, TypeError):
             return default
     
+    def safe_bool(key):
+        val = foundation_data.get(key, False)
+        if isinstance(val, bool):
+            return val
+        if isinstance(val, str):
+            return val.lower() in ['true', '1', 'x', 't']
+        return bool(val)
+    
     return jsonify({
-        'foundation_name': foundation_row['filer_organization_name'],
-        'foundation_ein': int(foundation_row['filer_ein']),
-        'grant_count': int(foundation_row['grant_count']),
-        'total_amount': int(foundation_row['total_amount']),
-        'median_grant': int(foundation_row['median_grant']),
-        'avg_grant': int(foundation_row['avg_grant']),
-        'min_grant': int(foundation_row['min_grant']),
-        'max_grant': int(foundation_row['max_grant']),
-        'states_served': foundation_row['states_served'] if isinstance(foundation_row['states_served'], list) else [],
-        'cities_served': foundation_row['cities_served'] if isinstance(foundation_row['cities_served'], list) else [],
-        'top_purposes': foundation_row['top_purposes'] if isinstance(foundation_row['top_purposes'], list) else [],
+        'foundation_name': foundation_data['foundation_name'],
+        'foundation_ein': foundation_data['foundation_ein'],
+        'grant_count': foundation_data['grant_count'],
+        'total_amount': foundation_data['total_amount'],
+        'median_grant': foundation_data['median_grant'],
+        'avg_grant': foundation_data['avg_grant'],
+        'min_grant': foundation_data['min_grant'],
+        'max_grant': foundation_data['max_grant'],
+        'states_served': foundation_data['states_served'],
+        'cities_served': foundation_data['cities_served'],
+        'top_purposes': foundation_data['top_purposes'],
         'latest_period': safe_get('latest_period'),
         'primary_state': safe_get('primary_state'),
         'states_data': states_data,
         'top_grants': top_grants_list,
         'recent_grants': recent_grants_list,
-        # NEW: Foundation-level information
+        # Foundation-level information
         'formation_year': safe_get('formation_year'),
         'foundation_address': safe_get('foundation_address_line1'),
         'foundation_address2': safe_get('foundation_address_line2'),
@@ -512,40 +267,34 @@ def get_foundation_stats(ein):
         'total_expenses': safe_int('total_expenses'),
         'total_distributions_paid': safe_int('total_distributions'),
         'investment_income': safe_int('investment_income'),
-        'is_private_operating_foundation': safe_get('is_private_operating_foundation') in ['true', 'True', '1', 'X'],
-        'is_501c3': safe_get('is_501c3') in ['true', 'True', '1', 'X'],
+        'is_private_operating_foundation': safe_bool('is_private_operating_foundation'),
+        'is_501c3': safe_bool('is_501c3'),
         'mission': safe_get('mission_description'),
-        # NEW: Officers/Directors
-        'officers': get_foundation_officers(ein)
+        # Officers/Directors
+        'officers': officers
     })
 
 
 @app.route('/api/foundation/<int:ein>')
 def get_foundation_basic(ein):
     """Get basic foundation information (used for display pages)"""
-    load_data()
-    # This endpoint was being used before but we'll keep it for compatibility
-    # Just return simple foundation info
-    foundation = foundations_agg[foundations_agg['filer_ein'] == ein]
+    # Get foundation data
+    foundation_data = supabase_api.get_foundation_aggregated_stats(ein)
     
-    if len(foundation) == 0:
+    if not foundation_data:
         return jsonify({'error': 'Foundation not found'}), 404
     
-    foundation_row = foundation.iloc[0]
-    
     return jsonify({
-        'foundation_name': foundation_row['filer_organization_name'],
-        'foundation_ein': int(foundation_row['filer_ein']),
-        'grant_count': int(foundation_row['grant_count']),
-        'total_amount': int(foundation_row['total_amount']),
+        'foundation_name': foundation_data['foundation_name'],
+        'foundation_ein': foundation_data['foundation_ein'],
+        'grant_count': foundation_data['grant_count'],
+        'total_amount': foundation_data['total_amount'],
     })
 
 
 if __name__ == '__main__':
-    load_data()  # Load data in development mode
     print("Starting Zeffy Grant Finder webapp...")
-    print(f"Loaded {len(df)} grants from {len(foundations_agg)} foundations")
-    print(f"Foundation aggregation complete!")
+    print("Connected to Supabase database")
     print("\n" + "="*60)
     print("🚀 Zeffy Grant Finder is running!")
     print("📍 Open your browser and visit: http://localhost:5001")
