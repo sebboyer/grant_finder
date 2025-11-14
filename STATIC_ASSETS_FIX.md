@@ -94,3 +94,4 @@ Visit `http://localhost:5001` and verify that:
 ✅ Vercel configuration routes static files properly
 ✅ No files are ignored that should be deployed
 
+

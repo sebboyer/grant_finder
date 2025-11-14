@@ -29,3 +29,6 @@ irs_data/
 
 # Vercel
 .vercel
+
+#CSV files
+*.csv

@@ -100,3 +100,4 @@ After successful data upload, you can optionally remove:
 - `check_tables.py`
 - `upload_data_to_supabase.py` (keep for future updates)
 
+

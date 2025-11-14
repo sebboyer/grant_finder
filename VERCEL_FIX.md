@@ -257,3 +257,4 @@ vercel --prod
 
 🎉 **Your Grant Finder should now work perfectly on Vercel!**
 
+

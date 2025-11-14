@@ -1,0 +1,90 @@
+
+-- This is the structure of the different tables available through the supabase database
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.Leaders (
+  leader_id text NOT NULL,
+  foundation_id text,
+  person_name text,
+  title text,
+  compensation text,
+  benefits text,
+  other_compensation text,
+  hours_per_week text,
+  is_officer text,
+  is_director text,
+  is_trustee text,
+  is_key_employee text,
+  tax_period_end text,
+  source_file text,
+  CONSTRAINT Leaders_pkey PRIMARY KEY (leader_id),
+  CONSTRAINT Leaders_foundation_id_fkey FOREIGN KEY (foundation_id) REFERENCES public.foundation(foundation_id)
+);
+CREATE TABLE public.Recipients (
+  recipient_id text NOT NULL,
+  recipient_name text,
+  recipient_ein text,
+  address_line1 text,
+  address_line2 text,
+  city text,
+  state text,
+  zip bigint,
+  country text,
+  grant_ids jsonb,
+  CONSTRAINT Recipients_pkey PRIMARY KEY (recipient_id)
+);
+CREATE TABLE public.foundation (
+  foundation_id text NOT NULL,
+  ein bigint,
+  organization_name text,
+  tax_period_begin text,
+  tax_period_end text,
+  address_line1 text,
+  address_line2 text,
+  city text,
+  state text,
+  zip bigint,
+  phone text,
+  website text,
+  formation_year text,
+  legal_domicile_state text,
+  total_assets_boy text,
+  total_assets_eoy text,
+  total_liabilities_eoy text,
+  net_assets_eoy text,
+  fair_market_value_eoy text,
+  total_revenue text,
+  total_expenses text,
+  investment_income text,
+  distributable_amount text,
+  total_distributions text,
+  undistributed_income text,
+  is_private_operating_foundation text,
+  is_501c3 text,
+  mission_description text,
+  leader_ids jsonb,
+  source_file text,
+  CONSTRAINT foundation_pkey PRIMARY KEY (foundation_id)
+);
+CREATE TABLE public.grants (
+  grant_id text NOT NULL,
+  foundation_id text,
+  recipient_id text,
+  grant_amount bigint,
+  cash_grant_amount bigint,
+  non_cash_grant_amount text,
+  grant_purpose text,
+  recipient_relationship text,
+  recipient_foundation_status text,
+  recipient_irc_section text,
+  non_cash_description text,
+  valuation_method text,
+  recipient_name text,
+  recipient_ein text,
+  recipient_city text,
+  recipient_state text,
+  tax_period_end text,
+  source_file text,
+  CONSTRAINT grants_pkey PRIMARY KEY (grant_id)
+);

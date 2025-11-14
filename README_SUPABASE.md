@@ -175,3 +175,4 @@ For issues or questions:
 2. Review `SUPABASE_SETUP.md` for setup instructions
 3. Test endpoints using provided curl commands
 
+
